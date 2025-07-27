@@ -18,11 +18,14 @@ include_directories(${CMAKE_CURRENT_LIST_DIR})
 add_compile_options(-Wall -Wextra -Werror)
 add_compile_options(-g -O2)
 
+set(PICO_STACK_SIZE 4096)
+
 add_executable(meshroom
-  meshroom.c
   led.c
   serial.c
-  shell.c)
+  shell.c
+  MeshRoom.cxx
+  meshroom.cxx)
 target_link_libraries(meshroom pico_stdlib libmeshtastic)
 pico_enable_stdio_uart(meshroom 0)
 pico_add_extra_outputs(meshroom)

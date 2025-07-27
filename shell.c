@@ -12,10 +12,9 @@
 #include <meshroom.h>
 #include <libmeshtastic.h>
 
-#define shell_printf(...) serial_printf(inproc.chan, __VA_ARGS__)
+#define shell_printf(...) serial_printf(console_chan, __VA_ARGS__)
 
 struct inproc {
-    int chan;
     char cmdline[256];
     unsigned int i;
 };
@@ -28,10 +27,9 @@ struct cmd_handler {
 static struct inproc inproc;
 static struct cmd_handler cmd_handlers[];
 
-void shell_init(int chan)
+void shell_init(void)
 {
     bzero(&inproc, sizeof(inproc));
-    inproc.chan = chan;
     serial_print_str(0, "> ");
 }
 
@@ -41,13 +39,13 @@ void shell_process(void)
 {
     char c;
 
-    while (serial_rx_ready(inproc.chan) > 0) {
-        serial_read(inproc.chan, &c, 1);
+    while (serial_rx_ready(console_chan) > 0) {
+        serial_read(console_chan, &c, 1);
         if (c == '\r') {
             inproc.cmdline[inproc.i] = '\0';
-            serial_print_str(inproc.chan, "\n");
+            serial_print_str(console_chan, "\n");
             execute_cmdline(inproc.cmdline);
-            serial_print_str(inproc.chan, "> ");
+            serial_print_str(console_chan, "> ");
             inproc.i = 0;
             inproc.cmdline[0] = '\0';
         } else if ((c == '\x7f') || (c == '\x08')) {
@@ -58,7 +56,7 @@ void shell_process(void)
             inproc.i = 0;
         } else if ((c != '\n') && isprint(c)) {
             if (inproc.i < (sizeof(inproc.cmdline) - 1)) {
-                serial_write(inproc.chan, &c, 1);
+                serial_write(console_chan, &c, 1);
                 inproc.cmdline[inproc.i] = c;
                 inproc.i++;
             }
@@ -143,23 +141,16 @@ int help(int argc, char **argv)
     return 0;
 }
 
-int wcfg(int argc, char **argv)
-{
-    (void)(argc);
-    (void)(argv);
-
-    if (G_mtc == NULL) {
-        shell_printf("mtc is NULL!\n");
-    } else {
-        mt_send_want_config(G_mtc);
-    }
-
-    return 0;
-}
+extern int MeshRoom_direct_message(int argc, char **argv);
 
 static struct cmd_handler cmd_handlers[] = {
     { "help", help, },
-    { "wcfg", wcfg, },
+    { "status", status, },
+    { "want_config", want_config, },
+    { "disconnect", disconnect, },
+    { "heartbeat", heartbeat, },
+    { "dm", direct_message },
+    { "cm", channel_message, },
     { NULL, NULL, },
 };
 

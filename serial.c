@@ -27,7 +27,7 @@
 #define UART_PARITY       UART_PARITY_NONE
 
 struct serial_buf {
-    char buf[2048];
+    char buf[256];
     unsigned int rp;
     unsigned int wp;
 };
@@ -40,6 +40,7 @@ static void serial0_interrupt_handler(void)
         char c = uart_getc(UART0_ID);
         serial_buf[0].buf[serial_buf[0].wp] = c;
         serial_buf[0].wp++;
+        serial_buf[0].wp %= sizeof(serial_buf[0].buf);
     }
 }
 
@@ -49,6 +50,7 @@ static void serial1_interrupt_handler(void)
         char c = uart_getc(UART1_ID);
         serial_buf[1].buf[serial_buf[1].wp] = c;
         serial_buf[1].wp++;
+        serial_buf[1].wp %= sizeof(serial_buf[1].buf);
     }
 }
 
@@ -100,6 +102,10 @@ int serial_write(int chan, const void *_buf, size_t len)
     }
 
     for (size_t i = 0; i < len; i++) {
+        if (!uart_is_writable(uart)) {
+            break;
+        }
+
         uart_putc_raw(uart, buf[i]);
         ret++;
     }
@@ -134,8 +140,7 @@ int serial_read(int chan, void *_buf, size_t len)
     if ((chan >= 0) && (chan < 2)) {
         unsigned int i = serial_buf[chan].rp;
         for (i = serial_buf[chan].rp;
-             (ret < (int) len) && (i != serial_buf[chan].wp);
-             i++) {
+             (ret < (int) len) && (i != serial_buf[chan].wp); i++) {
             i %= sizeof(serial_buf[chan].buf);
             *buf = serial_buf[chan].buf[i];
             buf++;
@@ -175,7 +180,7 @@ int serial_printf(int chan, const char *fmt, ...)
 {
     int ret;
     va_list ap;
-    char buf[1024];
+    static char buf[1024];
 
     va_start(ap, fmt);
     ret = vsnprintf(buf, sizeof(buf) - 1, fmt, ap);

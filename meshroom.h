@@ -7,21 +7,40 @@
 #ifndef MESHROOM_H
 #define MESHROOM_H
 
+#if !defined(EXTERN_C_BEGIN)
+#if defined(__cplusplus)
+#define EXTERN_C_BEGIN extern "C" {
+#else
+#define EXTERN_C_BEGIN
+#endif
+#endif
+
+#if !defined(EXTERN_C_END)
+#if defined(__cplusplus)
+#define EXTERN_C_END }
+#else
+#define EXTERN_C_END
+#endif
+#endif
+
+#include "serial.h"
+
+EXTERN_C_BEGIN
+
 extern void led_init(void);
 extern void led_set(bool on);
 
-extern void serial_init(void);
-extern int serial_write(int chan, const void *buf, size_t len);
-extern int serial_rx_ready(int chan);
-extern int serial_read(int chan, void *buf, size_t len);
-extern int serial_print_str(int chan, const char *str);
-extern int serial_printf(int chan, const char *fmt, ...);
-
-extern void shell_init(int chan);
+extern void shell_init(void);
 extern void shell_process(void);
 
-struct mt_client;
-extern struct mt_client *G_mtc;
+extern int status(int argc, char **argv);
+extern int want_config(int argc, char **argv);
+extern int disconnect(int argc, char **argv);
+extern int heartbeat(int argc, char **argv);
+extern int direct_message(int argc, char **argv);
+extern int channel_message(int argc, char **argv);
+
+EXTERN_C_END
 
 #endif
 
