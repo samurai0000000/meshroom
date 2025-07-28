@@ -4,21 +4,24 @@
  * Copyright (C) 2025, Charles Chiou
  */
 
+#include <time.h>
 #include <pico/stdlib.h>
 #include <hardware/sync.h>
 #include <hardware/watchdog.h>
 #include <libmeshtastic.h>
+#include <memory>
 #include <MeshRoom.hxx>
 #include <meshroom.h>
 #include "version.h"
 
-static MeshRoom meshroom;
+static shared_ptr<MeshRoom> meshroom;
 
 int main(void)
 {
     int ret = 0;
     bool led_on = false;
     unsigned int loop;
+    time_t now = time(NULL), last_want_config = 0;
 
     stdio_init_all();
 
@@ -30,10 +33,7 @@ int main(void)
     serial_printf(console_chan,
                   "The meshroom firmware for Raspberry Pi Pico\n");
     serial_printf(console_chan,
-                  "Version: %u.%u.%u\n",
-                  MYPROJECT_VERSION_MAJOR,
-                  MYPROJECT_VERSION_MINOR,
-                  MYPROJECT_VERSION_PATCH);
+                  "Version: %s\n", MYPROJECT_VERSION_STRING);
     serial_printf(console_chan,
                   "Built: %s@%s %s\n",
                   MYPROJECT_WHOAMI,
@@ -43,31 +43,40 @@ int main(void)
                   "-------------------------------------------\n");
     serial_printf(console_chan,
                   "Copyright (C) 2025, Charles Chiou\n");
+
+    meshroom = make_shared<MeshRoom>();
     shell_init();
 
-    watchdog_enable(5 * 1000, 0);
+    watchdog_enable(5000, 0);
     watchdog_enable_caused_reboot();
 
     for (loop = 0; true; loop++) {
         led_set(led_on);
         led_on = !led_on;
+        watchdog_update();
 
-        if (!meshroom.isConnected()) {
-            meshroom.sendWantConfig();
+        now = time(NULL);
+        if (!meshroom->isConnected() && ((now - last_want_config) >= 5)) {
+            ret = meshroom->sendWantConfig();
+            if (ret != false) {
+                last_want_config = time(NULL);
+            }
+        }
+
+        if (meshroom->isConnected() &&
+            ((loop % 60) == 0)) {
+            meshroom->sendHeartbeat();
         }
 
         while (serial_rx_ready(device_chan)) {
-            mt_serial_process(&meshroom._mtc, 0);
+            mt_serial_process(&meshroom->_mtc, 0);
         }
 
         shell_process();
 
-        best_effort_wfe_or_timeout(make_timeout_time_us(1000000));
-
-        watchdog_update();
-
-        if ((loop % 60) == 0) {
-            meshroom.sendHeartbeat();
+        if ((serial_rx_ready(console_chan) == 0) &&
+            (serial_rx_ready(device_chan) == 0)) {
+            best_effort_wfe_or_timeout(make_timeout_time_us(1000000));
         }
     }
 
@@ -83,20 +92,20 @@ int status(int argc, char **argv)
     (void)(argc);
     (void)(argv);
 
-    if (!meshroom.isConnected()) {
+    if (!meshroom->isConnected()) {
         serial_printf(console_chan, "Not connected\n");
     } else {
         unsigned int i;
 
         serial_printf(console_chan, "Me: %s %s\n",
-                      meshroom.getDisplayName(meshroom.whoami()).c_str(),
-                      meshroom.lookupLongName(meshroom.whoami()).c_str());
+                      meshroom->getDisplayName(meshroom->whoami()).c_str(),
+                      meshroom->lookupLongName(meshroom->whoami()).c_str());
         serial_printf(console_chan, "Nodes: %d seen\n",
-                      meshroom.nodeInfos().size());
+                      meshroom->nodeInfos().size());
         i = 0;
         for (map<uint32_t, meshtastic_NodeInfo>::const_iterator it =
-                 meshroom.nodeInfos().begin();
-             it != meshroom.nodeInfos().end(); it++, i++) {
+                 meshroom->nodeInfos().begin();
+             it != meshroom->nodeInfos().end(); it++, i++) {
             if ((i % 6) == 0) {
                 serial_printf(console_chan, "\t");
             }
@@ -116,8 +125,8 @@ int status(int argc, char **argv)
         }
 
         map<uint32_t, meshtastic_DeviceMetrics>::const_iterator dev;
-        dev = meshroom.deviceMetrics().find(meshroom.whoami());
-        if (dev != meshroom.deviceMetrics().end()) {
+        dev = meshroom->deviceMetrics().find(meshroom->whoami());
+        if (dev != meshroom->deviceMetrics().end()) {
             if (dev->second.has_channel_utilization) {
                 serial_printf(console_chan, "channel_utilization: %.2f\n",
                               dev->second.channel_utilization);
@@ -129,8 +138,8 @@ int status(int argc, char **argv)
         }
 
         map<uint32_t, meshtastic_EnvironmentMetrics>::const_iterator env;
-        env = meshroom.environmentMetrics().find(meshroom.whoami());
-        if (env != meshroom.environmentMetrics().end()) {
+        env = meshroom->environmentMetrics().find(meshroom->whoami());
+        if (env != meshroom->environmentMetrics().end()) {
             if (env->second.has_temperature) {
                 serial_printf(console_chan, "temperature: %.2f\n",
                               env->second.temperature);
@@ -156,7 +165,7 @@ int want_config(int argc, char **argv)
     (void)(argc);
     (void)(argv);
 
-    if (meshroom.sendWantConfig() != true) {
+    if (meshroom->sendWantConfig() != true) {
         serial_printf(console_chan, "failed!\n");
         ret = -1;
     }
@@ -171,7 +180,7 @@ int disconnect(int argc, char **argv)
     (void)(argc);
     (void)(argv);
 
-    if (meshroom.sendDisconnect() != true) {
+    if (meshroom->sendDisconnect() != true) {
         serial_printf(console_chan, "failed!\n");
         ret = -1;
     }
@@ -186,7 +195,7 @@ int heartbeat(int argc, char **argv)
     (void)(argc);
     (void)(argv);
 
-    if (meshroom.sendHeartbeat() != true) {
+    if (meshroom->sendHeartbeat() != true) {
         serial_printf(console_chan, "failed!\n", ret);
         ret = -1;
     }
@@ -206,8 +215,8 @@ int direct_message(int argc, char **argv)
         goto done;
     }
 
-    dest = meshroom.getId(argv[1]);
-    if ((dest == 0xffffffffU) || (dest == meshroom.whoami())) {
+    dest = meshroom->getId(argv[1]);
+    if ((dest == 0xffffffffU) || (dest == meshroom->whoami())) {
         serial_printf(console_chan, "name '%s' is invalid!\n", argv[1]);
         ret = -1;
         goto done;
@@ -218,7 +227,7 @@ int direct_message(int argc, char **argv)
         message += " ";
     }
 
-    if (meshroom.textMessage(dest, 0x0U, message.c_str()) != true) {
+    if (meshroom->textMessage(dest, 0x0U, message.c_str()) != true) {
         serial_printf(console_chan, "failed!\n");
         ret = -1;
         goto done;
@@ -243,7 +252,7 @@ int channel_message(int argc, char **argv)
         goto done;
     }
 
-    channel = meshroom.getChannel(argv[1]);
+    channel = meshroom->getChannel(argv[1]);
     if (channel == 0xffU) {
         serial_printf(console_chan, "channel '%s' is invalid!\n", argv[1]);
         ret = -1;
@@ -255,7 +264,7 @@ int channel_message(int argc, char **argv)
         message += " ";
     }
 
-    if (meshroom.textMessage(0xffffffffU, channel, message.c_str()) != true) {
+    if (meshroom->textMessage(0xffffffffU, channel, message.c_str()) != true) {
         serial_printf(console_chan, "failed!\n");
         ret = -1;
         goto done;

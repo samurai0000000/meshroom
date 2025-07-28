@@ -9,6 +9,7 @@
 #include <strings.h>
 #include <hardware/uart.h>
 #include <hardware/gpio.h>
+#include <hardware/sync.h>
 #include <meshroom.h>
 
 #define UART0_ID          uart0
@@ -42,6 +43,7 @@ static void serial0_interrupt_handler(void)
         serial_buf[0].wp++;
         serial_buf[0].wp %= sizeof(serial_buf[0].buf);
     }
+    __sev();
 }
 
 static void serial1_interrupt_handler(void)
@@ -52,6 +54,7 @@ static void serial1_interrupt_handler(void)
         serial_buf[1].wp++;
         serial_buf[1].wp %= sizeof(serial_buf[1].buf);
     }
+    __sev();
 }
 
 void serial_init(void)

@@ -53,8 +53,10 @@ void shell_process(void)
             inproc.i = 0;
             inproc.cmdline[0] = '\0';
         } else if ((c == '\x7f') || (c == '\x08')) {
-            shell_printf("\b \b", 3);
-            inproc.i--;
+            if (inproc.i > 0) {
+                shell_printf("\b \b", 3);
+                inproc.i--;
+            }
         } else if (c == '\x03') {
             shell_printf("^C\n> ");
             inproc.i = 0;
@@ -186,6 +188,7 @@ int bootsel(int argc, char **argv)
     (void)(argc);
     (void)(argv);
 
+    serial_printf(console_chan, "Rebooting to BOOTSEL mode\n");
     reset_usb_boot(0, 0);
 
     return 0;
