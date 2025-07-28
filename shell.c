@@ -5,10 +5,14 @@
  */
 
 #include <ctype.h>
+#include <malloc.h>
 #include <string.h>
 #include <strings.h>
 #include <pico/stdlib.h>
+#include <pico/time.h>
 #include <hardware/sync.h>
+#include <hardware/watchdog.h>
+#include <pico/bootrom.h>
 #include <meshroom.h>
 #include <libmeshtastic.h>
 
@@ -141,10 +145,68 @@ int help(int argc, char **argv)
     return 0;
 }
 
-extern int MeshRoom_direct_message(int argc, char **argv);
+int system(int argc, char **argv)
+{
+    extern char __StackLimit, __bss_end__;;
+    struct mallinfo m = mallinfo();
+    unsigned int total_heap = &__StackLimit  - &__bss_end__;
+    unsigned int used_heap = m.uordblks;
+    unsigned int free_heap = total_heap - used_heap;
+    unsigned int uptime = (unsigned int) (time_us_64() / 1000000);
+    unsigned int days, hour, min, sec;
+
+    (void)(argc);
+    (void)(argv);
+
+    sec = uptime % 60;
+    min = (uptime / 60) % 60;
+    hour = (uptime / 3600) % 24;
+    days = (uptime) / 86400;
+    if (days == 0) {
+        serial_printf(console_chan, "Up-time:    %.2u:%.2u:%.2u",
+                      hour, min, sec);
+    } else {
+        serial_printf(console_chan, "Up-time:    %ud %.2u:%.2u:%.2u",
+                      days, hour, min, sec);
+    }
+    if (watchdog_caused_reboot()) {
+        serial_printf(console_chan, " (rebooted by watchdog timer)\n");
+    } else {
+        serial_printf(console_chan, "\n");
+    }
+    serial_printf(console_chan, "Total Heap: %8u bytes\n", total_heap);
+    serial_printf(console_chan, " Free Heap: %8u bytes\n", free_heap);
+    serial_printf(console_chan, " Used Heap: %8u bytes\n", used_heap);
+
+    return 0;
+}
+
+int bootsel(int argc, char **argv)
+{
+    (void)(argc);
+    (void)(argv);
+
+    reset_usb_boot(0, 0);
+
+    return 0;
+}
+
+int reboot(int argc, char **argv)
+{
+    (void)(argc);
+    (void)(argv);
+
+    watchdog_enable(1, 0);
+    for (;;);
+
+    return 0;
+}
 
 static struct cmd_handler cmd_handlers[] = {
     { "help", help, },
+    { "system", system, },
+    { "bootsel", bootsel, },
+    { "reboot", reboot, },
     { "status", status, },
     { "want_config", want_config, },
     { "disconnect", disconnect, },

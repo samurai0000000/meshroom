@@ -6,9 +6,11 @@
 
 #include <pico/stdlib.h>
 #include <hardware/sync.h>
+#include <hardware/watchdog.h>
 #include <libmeshtastic.h>
 #include <MeshRoom.hxx>
 #include <meshroom.h>
+#include "version.h"
 
 static MeshRoom meshroom;
 
@@ -23,11 +25,28 @@ int main(void)
     led_init();
 
     serial_init();
-    serial_print_str(0,"\e[1;1H\e[2J\n");
-    serial_print_str(0, "The meshroom firmware for Raspberry Pi Pico\n");
-    serial_print_str(0, "-------------------------------------------\n");
-    serial_print_str(0, "Copyright (C) 2025, Charles Chiou\n");
+    serial_printf(console_chan,
+                  "\e[1;1H\e[2J\n");
+    serial_printf(console_chan,
+                  "The meshroom firmware for Raspberry Pi Pico\n");
+    serial_printf(console_chan,
+                  "Version: %u.%u.%u\n",
+                  MYPROJECT_VERSION_MAJOR,
+                  MYPROJECT_VERSION_MINOR,
+                  MYPROJECT_VERSION_PATCH);
+    serial_printf(console_chan,
+                  "Built: %s@%s %s\n",
+                  MYPROJECT_WHOAMI,
+                  MYPROJECT_HOSTNAME,
+                  MYPROJECT_DATE);
+    serial_printf(console_chan,
+                  "-------------------------------------------\n");
+    serial_printf(console_chan,
+                  "Copyright (C) 2025, Charles Chiou\n");
     shell_init();
+
+    watchdog_enable(5 * 1000, 0);
+    watchdog_enable_caused_reboot();
 
     for (loop = 0; true; loop++) {
         led_set(led_on);
@@ -40,8 +59,12 @@ int main(void)
         while (serial_rx_ready(device_chan)) {
             mt_serial_process(&meshroom._mtc, 0);
         }
+
         shell_process();
+
         best_effort_wfe_or_timeout(make_timeout_time_us(1000000));
+
+        watchdog_update();
 
         if ((loop % 60) == 0) {
             meshroom.sendHeartbeat();
