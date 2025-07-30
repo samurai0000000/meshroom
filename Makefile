@@ -29,3 +29,9 @@ build/meshroom.uf2: build/Makefile
 build/Makefile: CMakeLists.txt
 	@mkdir -p build
 	@cd build && cmake ..
+
+.PHONY: release
+
+release: build/Makefile
+	@rm -f build/version.h
+	@$(MAKE) -C build

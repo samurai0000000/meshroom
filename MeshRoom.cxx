@@ -5,6 +5,7 @@
  */
 
 #include <stddef.h>
+#include <hardware/uart.h>
 #include <algorithm>
 #include <meshroom.h>
 #include <MeshRoom.hxx>
@@ -21,14 +22,14 @@ MeshRoom::~MeshRoom()
 }
 
 void MeshRoom::gotTextMessage(const meshtastic_MeshPacket &packet,
-			      const string &message)
+                              const string &message)
 {
     SimpleClient::gotTextMessage(packet, message);
     string reply;
     bool result = false;
 
     if (packet.to == whoami()) {
-        serial_printf(console_chan, "%s: %s\n",
+        serial_printf(uart0, "%s: %s\n",
                       getDisplayName(packet.from).c_str(), message.c_str());
 
         reply = lookupShortName(packet.from) + ", you said '" + message + "'!";
@@ -38,15 +39,15 @@ void MeshRoom::gotTextMessage(const meshtastic_MeshPacket &packet,
 
         result = textMessage(packet.from, packet.channel, reply);
         if (result == false) {
-            serial_printf(console_chan, "textMessage '%s' failed!\n",
+            serial_printf(uart0, "textMessage '%s' failed!\n",
                           reply.c_str());
         } else {
-            serial_printf(console_chan, "my_reply to %s: %s\n",
+            serial_printf(uart0, "my_reply to %s: %s\n",
                           getDisplayName(packet.from).c_str(),
                           reply.c_str());
         }
     } else {
-        serial_printf(console_chan, "%s on #%s: %s\n",
+        serial_printf(uart0, "%s on #%s: %s\n",
                       getDisplayName(packet.from).c_str(),
                       getChannelName(packet.channel).c_str(),
                       message.c_str());
@@ -68,10 +69,10 @@ void MeshRoom::gotTextMessage(const meshtastic_MeshPacket &packet,
             if (!reply.empty()) {
                 result = textMessage(0xffffffffU, packet.channel, reply);
                 if (result == false) {
-                    serial_printf(console_chan, "textMessage '%s' failed!\n",
+                    serial_printf(uart0, "textMessage '%s' failed!\n",
                                   reply.c_str());
                 } else {
-                    serial_printf(console_chan, "my reply to %s: %s\n",
+                    serial_printf(uart0, "my reply to %s: %s\n",
                                   getDisplayName(packet.from).c_str(),
                                   reply.c_str());
                 }
@@ -81,21 +82,21 @@ void MeshRoom::gotTextMessage(const meshtastic_MeshPacket &packet,
 }
 
 void MeshRoom::gotPosition(const meshtastic_MeshPacket &packet,
-			   const meshtastic_Position &position)
+                           const meshtastic_Position &position)
 {
     SimpleClient::gotPosition(packet, position);
-    serial_printf(console_chan, "%s sent position\n",
+    serial_printf(uart0, "%s sent position\n",
                   getDisplayName(packet.from).c_str());
 }
 
 void MeshRoom::gotRouting(const meshtastic_MeshPacket &packet,
-                         const meshtastic_Routing &routing)
+                          const meshtastic_Routing &routing)
 {
     SimpleClient::gotRouting(packet, routing);
     if ((routing.which_variant == meshtastic_Routing_error_reason_tag) &&
         (routing.error_reason == meshtastic_Routing_Error_NONE) &&
         (packet.from != packet.to)) {
-        serial_printf(console_chan,
+        serial_printf(uart0,
                       "traceroute from %s -> %s[%.2fdB]\n",
                       getDisplayName(packet.from).c_str(),
                       packet.rx_snr);
@@ -103,18 +104,18 @@ void MeshRoom::gotRouting(const meshtastic_MeshPacket &packet,
 }
 
 void MeshRoom::gotDeviceMetrics(const meshtastic_MeshPacket &packet,
-				const meshtastic_DeviceMetrics &metrics)
+                                const meshtastic_DeviceMetrics &metrics)
 {
     SimpleClient::gotDeviceMetrics(packet, metrics);
-    serial_printf(console_chan, "%s sent device metrics\n",
+    serial_printf(uart0, "%s sent device metrics\n",
                   getDisplayName(packet.from).c_str());
 }
 
 void MeshRoom::gotEnvironmentMetrics(const meshtastic_MeshPacket &packet,
-				     const meshtastic_EnvironmentMetrics &metrics)
+                                     const meshtastic_EnvironmentMetrics &metrics)
 {
     SimpleClient::gotEnvironmentMetrics(packet, metrics);
-    serial_printf(console_chan, "%s sent environment metrics\n",
+    serial_printf(uart0, "%s sent environment metrics\n",
                   getDisplayName(packet.from).c_str());
 }
 
@@ -125,24 +126,24 @@ void MeshRoom::gotTraceRoute(const meshtastic_MeshPacket &packet,
     if ((routeDiscovery.route_count > 0) &&
         (routeDiscovery.route_back_count == 0)) {
         float rx_snr;
-        serial_printf(console_chan, "traceroute from %s -> ",
+        serial_printf(uart0, "traceroute from %s -> ",
                       getDisplayName(packet.from).c_str());
         for (unsigned int i = 0; i < routeDiscovery.route_count; i++) {
             if (i > 0) {
-                serial_printf(console_chan, " -> ");
+                serial_printf(uart0, " -> ");
             }
-            serial_printf(console_chan, "%s",
+            serial_printf(uart0, "%s",
                           getDisplayName(routeDiscovery.route[i]).c_str());
             if (routeDiscovery.snr_towards[i] != INT8_MIN) {
                 rx_snr = routeDiscovery.snr_towards[i];
                 rx_snr /= 4.0;
-                serial_printf(console_chan, "[%.2fdB]", rx_snr);
+                serial_printf(uart0, "[%.2fdB]", rx_snr);
             } else {
-                serial_printf(console_chan, "[???dB]");
+                serial_printf(uart0, "[???dB]");
             }
         }
         rx_snr = packet.rx_snr;
-        serial_printf(console_chan, " -> %s[%.2fdB]\n",
+        serial_printf(uart0, " -> %s[%.2fdB]\n",
                       getDisplayName(packet.to).c_str(), rx_snr);
     }
 }

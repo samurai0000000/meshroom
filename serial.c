@@ -5,11 +5,14 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdarg.h>
 #include <strings.h>
+#include <pico/time.h>
 #include <hardware/uart.h>
 #include <hardware/gpio.h>
 #include <hardware/sync.h>
+#include <hardware/watchdog.h>
 #include <meshroom.h>
 
 #define UART0_ID          uart0
@@ -27,82 +30,90 @@
 #define UART_STOP_BITS    1
 #define UART_PARITY       UART_PARITY_NONE
 
+#define SERIAL_PBUF_SIZE  2048
+
 struct serial_buf {
-    char buf[256];
     unsigned int rp;
     unsigned int wp;
+    char buf[32];
 };
 
-static struct serial_buf serial_buf[2];
+static char *pbuf = NULL;
+static struct serial_buf *serial_buf = NULL;
 
-static void serial0_interrupt_handler(void)
+static void serial_interrupt_handler(void)
 {
-    while (uart_is_readable(UART0_ID)) {
-        char c = uart_getc(UART0_ID);
+    uint32_t state = save_and_disable_interrupts();
+#if defined(MEASURE_CPU_UTILIZATION)
+    uint64_t t_0 = time_us_64();
+#endif
+
+    while (uart_is_readable(uart0)) {
+        char c = uart_getc(uart0);
         serial_buf[0].buf[serial_buf[0].wp] = c;
         serial_buf[0].wp++;
         serial_buf[0].wp %= sizeof(serial_buf[0].buf);
     }
-    __sev();
-}
 
-static void serial1_interrupt_handler(void)
-{
-    while (uart_is_readable(UART1_ID)) {
-        char c = uart_getc(UART1_ID);
+    while (uart_is_readable(uart1)) {
+        char c = uart_getc(uart1);
         serial_buf[1].buf[serial_buf[1].wp] = c;
         serial_buf[1].wp++;
         serial_buf[1].wp %= sizeof(serial_buf[1].buf);
     }
+
+#if defined(MEASURE_CPU_UTILIZATION)
+    t_0 = time_us_64() - t_0;
+    t_cpu_total += t_0;
+    t_cpu_busy += t_0;
+#endif
+
+    restore_interrupts(state);
     __sev();
 }
 
 void serial_init(void)
 {
-    bzero(serial_buf, sizeof(serial_buf));
+    pbuf = (char *) malloc(SERIAL_PBUF_SIZE);
 
-    uart_init(UART0_ID, UART0_BAUD_RATE);
+    serial_buf = (struct serial_buf *) malloc(sizeof(struct serial_buf) * 2);
+    serial_buf[0].rp = 0;
+    serial_buf[0].wp = 0;
+    serial_buf[1].rp = 0;
+    serial_buf[1].wp = 0;
+
+    uart_init(uart0, UART0_BAUD_RATE);
     gpio_set_function(UART0_TX_PIN, GPIO_FUNC_UART);
     gpio_set_function(UART0_RX_PIN, GPIO_FUNC_UART);
     uart_set_hw_flow(UART0_ID, false, false);
+    uart_set_fifo_enabled(UART0_ID, true);
     uart_set_format(UART0_ID, UART_DATA_BITS, UART_STOP_BITS, UART_PARITY);
-    irq_set_exclusive_handler(UART0_IRQ, serial0_interrupt_handler);
+    irq_set_exclusive_handler(UART0_IRQ, serial_interrupt_handler);
     irq_set_enabled(UART0_IRQ, true);
     uart_set_irq_enables(UART0_ID, true, false);
 
-    uart_init(UART1_ID, UART1_BAUD_RATE);
+    uart_init(uart1, UART1_BAUD_RATE);
     gpio_set_function(UART1_TX_PIN, GPIO_FUNC_UART);
     gpio_set_function(UART1_RX_PIN, GPIO_FUNC_UART);
     uart_set_hw_flow(UART1_ID, false, false);
+    uart_set_fifo_enabled(UART1_ID, true);
     uart_set_format(UART1_ID, UART_DATA_BITS, UART_STOP_BITS, UART_PARITY);
-    irq_set_exclusive_handler(UART1_IRQ, serial1_interrupt_handler);
+    irq_set_exclusive_handler(UART1_IRQ, serial_interrupt_handler);
     irq_set_enabled(UART1_IRQ, true);
     uart_set_irq_enables(UART1_ID, true, false);
 }
 
-static uart_inst_t *serial_chan2inst(int chan)
-{
-    uart_inst_t *ret = NULL;
-
-    if (chan == 0) {
-        ret = UART0_ID;
-    } else if (chan == 1) {
-        ret = UART1_ID;
-    }
-
-    return ret;
-}
-
-int serial_write(int chan, const void *_buf, size_t len)
+int serial_write(uart_inst_t *uart, const void *_buf, size_t len)
 {
     int ret = 0;
     const uint8_t *buf = (const uint8_t *) _buf;
-    uart_inst_t *uart = serial_chan2inst(chan);
 
     if (uart == NULL) {
         ret = -1;
         goto done;
     }
+
+    uint32_t state = save_and_disable_interrupts();
 
     for (size_t i = 0; i < len; i++) {
         if (!uart_is_writable(uart)) {
@@ -113,65 +124,33 @@ int serial_write(int chan, const void *_buf, size_t len)
         ret++;
     }
 
+    restore_interrupts(state);
+
 done:
 
     return ret;
 }
 
-int serial_rx_ready(int chan)
+int serial_rx_ready(uart_inst_t *uart)
 {
     int ret = 0;
+    int chan = -1;
 
-    if ((chan >= 0) && (chan < 2)) {
-        if (serial_buf[chan].wp < serial_buf[chan].rp) {
-            ret = sizeof(serial_buf[chan].buf) -
-                serial_buf[chan].rp +
-                serial_buf[chan].wp;
-        } else {
-            ret = serial_buf[chan].wp - serial_buf[chan].rp;
-        }
-    }
-
-    return ret;
-}
-
-int serial_read(int chan, void *_buf, size_t len)
-{
-    int ret = 0;
-    uint8_t *buf = (uint8_t *) _buf;
-
-    if ((chan >= 0) && (chan < 2)) {
-        unsigned int i = serial_buf[chan].rp;
-        for (i = serial_buf[chan].rp;
-             (ret < (int) len) && (i != serial_buf[chan].wp); i++) {
-            i %= sizeof(serial_buf[chan].buf);
-            *buf = serial_buf[chan].buf[i];
-            buf++;
-            ret++;
-        }
-        serial_buf[chan].rp = i;
-    }
-
-    return ret;
-}
-
-int serial_print_str(int chan, const char *str)
-{
-    int ret = 0;
-    uart_inst_t *uart = serial_chan2inst(chan);
-
-    if (uart == NULL) {
+    if (uart == uart0) {
+        chan = 0;
+    } else if (uart == uart1) {
+        chan = 1;
+    } else {
         ret = -1;
         goto done;
     }
 
-    while (*str != '\0') {
-        if (*str == '\n') {
-            uart_putc_raw(uart, '\r');
-        }
-        uart_putc_raw(uart, *str);
-        ret++;
-        str++;
+    if (serial_buf[chan].wp < serial_buf[chan].rp) {
+        ret = sizeof(serial_buf[chan].buf) -
+            serial_buf[chan].rp +
+            serial_buf[chan].wp;
+    } else {
+        ret = serial_buf[chan].wp - serial_buf[chan].rp;
     }
 
 done:
@@ -179,17 +158,64 @@ done:
     return ret;
 }
 
-int serial_printf(int chan, const char *fmt, ...)
+int serial_read(uart_inst_t *uart, void *_buf, size_t len)
+{
+    int ret = 0;
+    int chan = -1;
+    uint8_t *buf = (uint8_t *) _buf;
+
+    if (uart == uart0) {
+        chan = 0;
+    } else if (uart == uart1) {
+        chan = 1;
+    } else {
+        ret = -1;
+        goto done;
+    }
+
+    while ((len > 0) &&
+           (serial_buf[chan].rp != serial_buf[chan].wp)) {
+        *buf = serial_buf[chan].buf[serial_buf[chan].rp];
+        len--;
+        buf++;
+        ret++;
+        serial_buf[chan].rp++;
+        serial_buf[chan].rp %= sizeof(serial_buf[chan].buf);
+    }
+
+done:
+
+    return ret;
+}
+
+int serial_print_str(uart_inst_t *uart, const char *str)
+{
+    int ret = 0;
+
+    while (*str != '\0') {
+        if (*str == '\n') {
+            while (serial_write(uart, "\r", 1) != 1);
+        }
+
+        while (serial_write(uart, str, 1) != 1);
+
+        ret++;
+        str++;
+    }
+
+    return ret;
+}
+
+int serial_printf(uart_inst_t *uart, const char *fmt, ...)
 {
     int ret;
     va_list ap;
-    static char buf[1024];
 
     va_start(ap, fmt);
-    ret = vsnprintf(buf, sizeof(buf) - 1, fmt, ap);
+    ret = vsnprintf(pbuf, SERIAL_PBUF_SIZE - 1, fmt, ap);
     va_end(ap);
 
-    ret = serial_print_str(chan, buf);
+    ret = serial_print_str(uart, pbuf);
 
     return ret;
 }

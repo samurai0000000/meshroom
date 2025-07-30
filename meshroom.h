@@ -27,18 +27,18 @@
 
 EXTERN_C_BEGIN
 
+#define MEASURE_CPU_UTILIZATION
+
+#if defined(MEASURE_CPU_UTILIZATION)
+extern uint64_t t_cpu_total;
+extern uint64_t t_cpu_busy;
+#endif
+
 extern void led_init(void);
 extern void led_set(bool on);
 
 extern void shell_init(void);
 extern void shell_process(void);
-
-extern int status(int argc, char **argv);
-extern int want_config(int argc, char **argv);
-extern int disconnect(int argc, char **argv);
-extern int heartbeat(int argc, char **argv);
-extern int direct_message(int argc, char **argv);
-extern int channel_message(int argc, char **argv);
 
 EXTERN_C_END
 
