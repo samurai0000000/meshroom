@@ -35,8 +35,10 @@ extern shared_ptr<MeshRoom> meshroom;
 
 static int system(int argc, char **argv)
 {
-    extern char __StackLimit, __bss_end__;;
+    extern char __StackTop, __StackBottom;
+    extern char __StackLimit, __bss_end__;
     struct mallinfo m = mallinfo();
+    unsigned int stack_size = &__StackTop - &__StackBottom;
     unsigned int total_heap = &__StackLimit  - &__bss_end__;
     unsigned int used_heap = m.uordblks;
     unsigned int free_heap = total_heap - used_heap;
@@ -66,6 +68,7 @@ static int system(int argc, char **argv)
     serial_printf(uart0, " CPU Util.: %.3f%%\n",
                   ((float) t_cpu_busy) / ((float) t_cpu_total) * 100.0);
 #endif
+    serial_printf(uart0, "Stack Size: %8u bytes\n", stack_size);
     serial_printf(uart0, "Total Heap: %8u bytes\n", total_heap);
     serial_printf(uart0, " Free Heap: %8u bytes\n", free_heap);
     serial_printf(uart0, " Used Heap: %8u bytes\n", used_heap);
@@ -114,7 +117,7 @@ static int status(int argc, char **argv)
                       meshroom->lookupLongName(meshroom->whoami()).c_str());
 
 #if 0
-        serial_printf(uart0, "Channels: %s\n",
+        serial_printf(uart0, "Channels: %d\n",
                       meshroom->channels().size());
         for (map<uint8_t, meshtastic_Channel>::const_iterator it =
                  meshroom->channels().begin();
@@ -136,7 +139,7 @@ static int status(int argc, char **argv)
         serial_printf(uart0, "Channels: %d\n", ret);
         for (i = 0; i < meshroom->channels().size(); i++) {
             if (meshroom->isChannelValid(i)) {
-                serial_printf(uart0, "chan#%u: %s\n", i,
+                serial_printf(uart0, "  chan#%u: %s\n", i,
                               meshroom->getChannelName(i).c_str());
             }
         }
@@ -148,21 +151,16 @@ static int status(int argc, char **argv)
         for (map<uint32_t, meshtastic_NodeInfo>::const_iterator it =
                  meshroom->nodeInfos().begin();
              it != meshroom->nodeInfos().end(); it++, i++) {
-            if ((i % 6) == 0) {
-                serial_printf(uart0, "\t");
+            if ((i % 4) == 0) {
+                serial_printf(uart0, "  ");
             }
-            if (it->second.has_user) {
-                serial_printf(uart0, "%s\t",
-                              it->second.user.short_name);
-            } else {
-                serial_printf(uart0, "!%.8x\t",
-                              it->second.num);
-            }
-            if ((i % 6) == 5) {
+            serial_printf(uart0, "%16s  ",
+                          meshroom->getDisplayName(it->second.num).c_str());
+            if ((i % 4) == 3) {
                 serial_printf(uart0, "\n");
             }
         }
-        if ((i % 6) != 0) {
+        if ((i % 4) != 0) {
             serial_printf(uart0, "\n");
         }
 
@@ -269,7 +267,7 @@ static int direct_message(int argc, char **argv)
         message += " ";
     }
 
-    if (meshroom->textMessage(dest, 0x0U, message.c_str()) != true) {
+    if (meshroom->textMessage(dest, 0x0U, message) != true) {
         serial_printf(uart0, "failed!\n");
         ret = -1;
         goto done;
@@ -306,7 +304,7 @@ static int channel_message(int argc, char **argv)
         message += " ";
     }
 
-    if (meshroom->textMessage(0xffffffffU, channel, message.c_str()) != true) {
+    if (meshroom->textMessage(0xffffffffU, channel, message) != true) {
         serial_printf(uart0, "failed!\n");
         ret = -1;
         goto done;

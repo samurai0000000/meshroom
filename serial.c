@@ -15,13 +15,11 @@
 #include <hardware/watchdog.h>
 #include <meshroom.h>
 
-#define UART0_ID          uart0
 #define UART0_TX_PIN      0
 #define UART0_RX_PIN      1
 #define UART0_IRQ         UART0_IRQ
 #define UART0_BAUD_RATE   115200
 
-#define UART1_ID          uart1
 #define UART1_TX_PIN      4
 #define UART1_RX_PIN      5
 #define UART1_BAUD_RATE   115200
@@ -69,7 +67,6 @@ static void serial_interrupt_handler(void)
 #endif
 
     restore_interrupts(state);
-    __sev();
 }
 
 void serial_init(void)
@@ -85,22 +82,22 @@ void serial_init(void)
     uart_init(uart0, UART0_BAUD_RATE);
     gpio_set_function(UART0_TX_PIN, GPIO_FUNC_UART);
     gpio_set_function(UART0_RX_PIN, GPIO_FUNC_UART);
-    uart_set_hw_flow(UART0_ID, false, false);
-    uart_set_fifo_enabled(UART0_ID, true);
-    uart_set_format(UART0_ID, UART_DATA_BITS, UART_STOP_BITS, UART_PARITY);
+    uart_set_hw_flow(uart0, false, false);
+    uart_set_fifo_enabled(uart0, true);
+    uart_set_format(uart0, UART_DATA_BITS, UART_STOP_BITS, UART_PARITY);
     irq_set_exclusive_handler(UART0_IRQ, serial_interrupt_handler);
     irq_set_enabled(UART0_IRQ, true);
-    uart_set_irq_enables(UART0_ID, true, false);
+    uart_set_irq_enables(uart0, true, false);
 
     uart_init(uart1, UART1_BAUD_RATE);
     gpio_set_function(UART1_TX_PIN, GPIO_FUNC_UART);
     gpio_set_function(UART1_RX_PIN, GPIO_FUNC_UART);
-    uart_set_hw_flow(UART1_ID, false, false);
-    uart_set_fifo_enabled(UART1_ID, true);
-    uart_set_format(UART1_ID, UART_DATA_BITS, UART_STOP_BITS, UART_PARITY);
+    uart_set_hw_flow(uart1, false, false);
+    uart_set_fifo_enabled(uart1, true);
+    uart_set_format(uart1, UART_DATA_BITS, UART_STOP_BITS, UART_PARITY);
     irq_set_exclusive_handler(UART1_IRQ, serial_interrupt_handler);
     irq_set_enabled(UART1_IRQ, true);
-    uart_set_irq_enables(UART1_ID, true, false);
+    uart_set_irq_enables(uart1, true, false);
 }
 
 int serial_write(uart_inst_t *uart, const void *_buf, size_t len)

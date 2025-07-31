@@ -18,7 +18,8 @@ include_directories(${CMAKE_CURRENT_LIST_DIR})
 add_compile_options(-Wall -Wextra -Werror)
 add_compile_options(-g -O2)
 
-set(PICO_STACK_SIZE 4096)
+set(PICO_USE_STACK_GUARDS 1)
+set(PICO_STACK_SIZE 32768)
 
 set(WHOAMI_OUTPUT)
 execute_process(
@@ -57,6 +58,7 @@ add_executable(meshroom
   meshroom.cxx)
 pico_enable_stdio_usb(meshroom 0)
 pico_enable_stdio_uart(meshroom 1)
+target_compile_definitions(meshroom PRIVATE PICO_STACK_SIZE=${PICO_STACK_SIZE})
 target_include_directories(meshroom PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(meshroom pico_stdlib libmeshtastic)
 pico_enable_stdio_uart(meshroom 0)
