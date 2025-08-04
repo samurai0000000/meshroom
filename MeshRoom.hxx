@@ -25,14 +25,10 @@ protected:
 
     virtual void gotTextMessage(const meshtastic_MeshPacket &packet,
                                 const string &message);
-    virtual void gotPosition(const meshtastic_MeshPacket &packet,
-                             const meshtastic_Position &position);
+    virtual void gotTelemetry(const meshtastic_MeshPacket &packet,
+                              const meshtastic_Telemetry &telemetry);
     virtual void gotRouting(const meshtastic_MeshPacket &packet,
                             const meshtastic_Routing &routing);
-    virtual void gotDeviceMetrics(const meshtastic_MeshPacket &packet,
-                                  const meshtastic_DeviceMetrics &metrics);
-    virtual void gotEnvironmentMetrics(const meshtastic_MeshPacket &packet,
-                                       const meshtastic_EnvironmentMetrics &metrics);
     virtual void gotTraceRoute(const meshtastic_MeshPacket &packet,
                                const meshtastic_RouteDiscovery &routeDiscovery);
 

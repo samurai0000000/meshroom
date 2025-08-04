@@ -35,3 +35,20 @@ build/Makefile: CMakeLists.txt
 release: build/Makefile
 	@rm -f build/version.h
 	@$(MAKE) -C build
+
+# Development & debug targets
+
+.PHONY: openocd
+
+openocd:
+	@openocd -f /usr/share/openocd/scripts/interface/cmsis-dap.cfg -f /usr/share/openocd/scripts/target/rp2040.cfg -c "adapter speed 5000"
+
+.PHONY: opencd-reset
+
+openocd-reset:
+	@openocd -f /usr/share/openocd/scripts/interface/cmsis-dap.cfg -f /usr/share/openocd/scripts/target/rp2040.cfg -c "init; reset; exit"
+
+.PHONY: gdb
+
+gdb: build/meshroom.elf
+	@gdb-multiarch $< -ex 'target remote localhost:3333'

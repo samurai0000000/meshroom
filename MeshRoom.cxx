@@ -51,7 +51,7 @@ void MeshRoom::gotTextMessage(const meshtastic_MeshPacket &packet,
                       getDisplayName(packet.from).c_str(),
                       getChannelName(packet.channel).c_str(),
                       message.c_str());
-        if (getChannelName(packet.channel) == "serial") {
+        if ((packet.channel == 0) || (packet.channel == 1)) {
             string msg = message;
             transform(msg.begin(), msg.end(), msg.begin(),
                       [](unsigned char c) {
@@ -81,12 +81,14 @@ void MeshRoom::gotTextMessage(const meshtastic_MeshPacket &packet,
     }
 }
 
-void MeshRoom::gotPosition(const meshtastic_MeshPacket &packet,
-                           const meshtastic_Position &position)
+void MeshRoom::gotTelemetry(const meshtastic_MeshPacket &packet,
+                            const meshtastic_Telemetry &telemetry)
 {
-    SimpleClient::gotPosition(packet, position);
-    serial_printf(uart0, "%s sent position\n",
-                  getDisplayName(packet.from).c_str());
+    if (packet.from == whoami()) {
+        SimpleClient::gotTelemetry(packet, telemetry);
+    } else {
+        // Ignore telemetry from other nodes
+    }
 }
 
 void MeshRoom::gotRouting(const meshtastic_MeshPacket &packet,
@@ -101,22 +103,6 @@ void MeshRoom::gotRouting(const meshtastic_MeshPacket &packet,
                       getDisplayName(packet.from).c_str(),
                       packet.rx_snr);
     }
-}
-
-void MeshRoom::gotDeviceMetrics(const meshtastic_MeshPacket &packet,
-                                const meshtastic_DeviceMetrics &metrics)
-{
-    SimpleClient::gotDeviceMetrics(packet, metrics);
-    serial_printf(uart0, "%s sent device metrics\n",
-                  getDisplayName(packet.from).c_str());
-}
-
-void MeshRoom::gotEnvironmentMetrics(const meshtastic_MeshPacket &packet,
-                                     const meshtastic_EnvironmentMetrics &metrics)
-{
-    SimpleClient::gotEnvironmentMetrics(packet, metrics);
-    serial_printf(uart0, "%s sent environment metrics\n",
-                  getDisplayName(packet.from).c_str());
 }
 
 void MeshRoom::gotTraceRoute(const meshtastic_MeshPacket &packet,

@@ -5,9 +5,10 @@
 cmake_minimum_required(VERSION 3.13)
 
 include (pico-sdk/external/pico_sdk_import.cmake)
-pico_sdk_init()
 
 project(meshmon VERSION 1.1.0 LANGUAGES C CXX ASM)
+
+pico_sdk_init()
 
 add_subdirectory(libmeshtastic)
 
@@ -57,9 +58,8 @@ add_executable(meshroom
   MeshRoom.cxx
   meshroom.cxx)
 pico_enable_stdio_usb(meshroom 0)
-pico_enable_stdio_uart(meshroom 1)
+pico_enable_stdio_uart(meshroom 0)
 target_compile_definitions(meshroom PRIVATE PICO_STACK_SIZE=${PICO_STACK_SIZE})
 target_include_directories(meshroom PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(meshroom pico_stdlib libmeshtastic)
-pico_enable_stdio_uart(meshroom 0)
 pico_add_extra_outputs(meshroom)

@@ -17,11 +17,14 @@
 #include <libmeshtastic.h>
 #include <memory>
 #include <MeshRoom.hxx>
+#include "version.h"
 
 #define shell_printf(...) serial_printf(uart0, __VA_ARGS__)
 
+#define CMDLINE_SIZE 256
+
 struct inproc {
-    char cmdline[256];
+    char cmdline[CMDLINE_SIZE];
     unsigned int i;
 };
 
@@ -32,6 +35,18 @@ struct cmd_handler {
 
 static struct inproc inproc;
 extern shared_ptr<MeshRoom> meshroom;
+
+static int version(int argc, char **argv)
+{
+    (void)(argc);
+    (void)(argv);
+
+    serial_printf(uart0, "Version: %s\n", MYPROJECT_VERSION_STRING);
+    serial_printf(uart0, "Built: %s@%s %s\n",
+                  MYPROJECT_WHOAMI, MYPROJECT_HOSTNAME, MYPROJECT_DATE);
+
+    return 0;
+}
 
 static int system(int argc, char **argv)
 {
@@ -65,7 +80,7 @@ static int system(int argc, char **argv)
         serial_printf(uart0, "\n");
     }
 #if defined(MEASURE_CPU_UTILIZATION)
-    serial_printf(uart0, " CPU Util.: %.3f%%\n",
+    serial_printf(uart0, " CPU Util.: %7.3f%%\n",
                   ((float) t_cpu_busy) / ((float) t_cpu_total) * 100.0);
 #endif
     serial_printf(uart0, "Stack Size: %8u bytes\n", stack_size);
@@ -116,7 +131,6 @@ static int status(int argc, char **argv)
                       meshroom->getDisplayName(meshroom->whoami()).c_str(),
                       meshroom->lookupLongName(meshroom->whoami()).c_str());
 
-#if 0
         serial_printf(uart0, "Channels: %d\n",
                       meshroom->channels().size());
         for (map<uint8_t, meshtastic_Channel>::const_iterator it =
@@ -129,21 +143,6 @@ static int status(int argc, char **argv)
                               it->second.settings.name);
             }
         }
-#else
-        ret = 0;
-        for (i = 0; i < meshroom->channels().size(); i++) {
-            if (meshroom->isChannelValid(i)) {
-                ret++;
-            }
-        }
-        serial_printf(uart0, "Channels: %d\n", ret);
-        for (i = 0; i < meshroom->channels().size(); i++) {
-            if (meshroom->isChannelValid(i)) {
-                serial_printf(uart0, "  chan#%u: %s\n", i,
-                              meshroom->getChannelName(i).c_str());
-            }
-        }
-#endif
 
         serial_printf(uart0, "Nodes: %d seen\n",
                       meshroom->nodeInfos().size());
@@ -321,6 +320,7 @@ static int help(int argc, char **argv);
 
 static struct cmd_handler cmd_handlers[] = {
     { "help", help, },
+    { "version", version, },
     { "system", system, },
     { "bootsel", bootsel, },
     { "reboot", reboot, },
@@ -414,6 +414,7 @@ done:
 void shell_init(void)
 {
     bzero(&inproc, sizeof(inproc));
+
     serial_print_str(uart0, "> ");
 }
 
@@ -432,14 +433,14 @@ void shell_process(void)
             inproc.cmdline[0] = '\0';
         } else if ((c == '\x7f') || (c == '\x08')) {
             if (inproc.i > 0) {
-                shell_printf("\b \b", 3);
+                shell_printf("\b \b");
                 inproc.i--;
             }
         } else if (c == '\x03') {
             shell_printf("^C\n> ");
             inproc.i = 0;
         } else if ((c != '\n') && isprint(c)) {
-            if (inproc.i < (sizeof(inproc.cmdline) - 1)) {
+            if (inproc.i < (CMDLINE_SIZE - 1)) {
                 serial_write(uart0, &c, 1);
                 inproc.cmdline[inproc.i] = c;
                 inproc.i++;
@@ -447,6 +448,7 @@ void shell_process(void)
         }
     }
 }
+
 /*
  * Local variables:
  * mode: C++

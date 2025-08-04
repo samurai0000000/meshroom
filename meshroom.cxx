@@ -16,20 +16,31 @@
 #include <meshroom.h>
 #include "version.h"
 
+//#define USE_WATCHDOG_TIMER
+
 #if defined(MEASURE_CPU_UTILIZATION)
 uint64_t t_cpu_total = 0;
 uint64_t t_cpu_busy = 0;
 static uint64_t t_busy = time_us_64(), t_idle = 0, t_diff = 0;
-static uint32_t state;
 #endif
 
 shared_ptr<MeshRoom> meshroom = NULL;
 
+static bool timer_handler(repeating_timer_t *timer)
+{
+    (void)(timer);
+
+    __sev();
+
+    return true;
+}
+
 int main(void)
 {
     int ret = 0;
+    repeating_timer_t timer;
     bool led_on = false;
-    time_t now, last_want_config, last_heartbeat;
+    time_t now, last_flip, last_want_config, last_heartbeat;
     int rx0 = 0, rx1 = 0;
 
     stdio_init_all();
@@ -47,63 +58,83 @@ int main(void)
 
     meshroom = make_shared<MeshRoom>();
     meshroom->sendDisconnect();
+    sleep_ms(250);
 
     shell_init();
 
+#if defined(USE_WATCHDOG_TIMER)
     watchdog_enable(5000, true);
     watchdog_enable_caused_reboot();
+#endif
 
-    last_want_config = last_heartbeat = time(NULL);
+    now = time(NULL);
+    last_flip = now;
+    last_heartbeat = now;
+    last_want_config = 0;
+
+    add_repeating_timer_us(-1000000, timer_handler, NULL, &timer);
 
     for (;;) {
-        led_set(led_on);
-        led_on = !led_on;
-
         now = time(NULL);
+
+        if ((now - last_flip) >= 1) {
+            led_set(led_on);
+            led_on = !led_on;
+            last_flip = now;
+        }
+
         if (!meshroom->isConnected() && ((now - last_want_config) >= 5)) {
             ret = meshroom->sendWantConfig();
             if (ret == false) {
                 serial_printf(uart0, "sendWantConfig failed!\n");
-            } else {
-                last_want_config = now;
             }
+
+            last_want_config = now;
+        } else if (meshroom->isConnected()) {
+            last_want_config = now;
         }
 
-        if (meshroom->isConnected() && ((now - last_heartbeat) >= 5)) {
+        if (meshroom->isConnected() && ((now - last_heartbeat) >= 60)) {
             ret = meshroom->sendHeartbeat();
             if (ret == false) {
                 serial_printf(uart0, "sendHeartbeat failed!\n");
             }
+
+            last_heartbeat = now;
         }
 
-        while (((rx0 = serial_rx_ready(uart0)) > 0) ||
-               ((rx1 = serial_rx_ready(uart1)) > 0)) {
+        do {
+            rx0 = serial_rx_ready(uart0);
             if (rx0 > 0) {
                 shell_process();
             }
+
+            rx1 = serial_rx_ready(uart1);
             if (rx1 > 0) {
                 ret = mt_serial_process(&meshroom->_mtc, 0);
                 if (ret < 0) {
                     serial_printf(uart0, "mt_serial_process failed!\n");
                 }
             }
+
+#if defined(USE_WATCHDOG_TIMER)
             watchdog_update();
-        }
+#endif
+        } while ((rx0 > 0) || (rx1 > 0));
 
 #if defined(MEASURE_CPU_UTILIZATION)
-        state = save_and_disable_interrupts();
         t_idle = time_us_64();
         t_diff = t_idle - t_busy;
         t_cpu_total += t_diff;
         t_cpu_busy += t_diff;
-        restore_interrupts(state);
 #endif
 
-        best_effort_wfe_or_timeout(make_timeout_time_us(1000000));
+        __wfe();
+#if defined(USE_WATCHDOG_TIMER)
         watchdog_update();
+#endif
 
 #if defined(MEASURE_CPU_UTILIZATION)
-        state = save_and_disable_interrupts();
         t_busy = time_us_64();
         t_diff = t_busy - t_idle;
         t_cpu_total += t_diff;
@@ -112,7 +143,6 @@ int main(void)
             t_cpu_total /= 2;
             t_cpu_busy /= 2;
         }
-        restore_interrupts(state);
 #endif
     }
 
@@ -128,7 +158,7 @@ int main(void)
 
 /*
  * Local variables:
- * mode: C
+ * mode: C++
  * c-file-style: "BSD"
  * c-basic-offset: 4
  * tab-width: 4
