@@ -9,14 +9,15 @@
 
 EXTERN_C_BEGIN
 
-typedef struct uart_inst uart_inst_t;
-
 extern void serial_init(void);
-extern int serial_write(uart_inst_t *uart, const void *buf, size_t len);
-extern int serial_rx_ready(uart_inst_t *uart);
-extern int serial_read(uart_inst_t *uart, void *buf, size_t len);
-extern int serial_print_str(uart_inst_t *uart, const char *str);
-extern int serial_printf(uart_inst_t *uart, const char *fmt, ...);
+
+extern int console_printf(const char *fmt, ...);
+extern int console_rx_ready(void);
+extern int console_read(uint8_t *data, size_t size);
+
+extern int serial_write(const void *buf, size_t len);
+extern int serial_rx_ready(void);
+extern int serial_read(void *buf, size_t len);
 
 EXTERN_C_END
 

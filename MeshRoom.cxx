@@ -29,8 +29,8 @@ void MeshRoom::gotTextMessage(const meshtastic_MeshPacket &packet,
     bool result = false;
 
     if (packet.to == whoami()) {
-        serial_printf(uart0, "%s: %s\n",
-                      getDisplayName(packet.from).c_str(), message.c_str());
+        console_printf("%s: %s\n",
+                       getDisplayName(packet.from).c_str(), message.c_str());
 
         reply = lookupShortName(packet.from) + ", you said '" + message + "'!";
         if (reply.size() > 200) {
@@ -39,18 +39,18 @@ void MeshRoom::gotTextMessage(const meshtastic_MeshPacket &packet,
 
         result = textMessage(packet.from, packet.channel, reply);
         if (result == false) {
-            serial_printf(uart0, "textMessage '%s' failed!\n",
-                          reply.c_str());
+            console_printf("textMessage '%s' failed!\n",
+                           reply.c_str());
         } else {
-            serial_printf(uart0, "my_reply to %s: %s\n",
-                          getDisplayName(packet.from).c_str(),
-                          reply.c_str());
+            console_printf("my_reply to %s: %s\n",
+                           getDisplayName(packet.from).c_str(),
+                           reply.c_str());
         }
     } else {
-        serial_printf(uart0, "%s on #%s: %s\n",
-                      getDisplayName(packet.from).c_str(),
-                      getChannelName(packet.channel).c_str(),
-                      message.c_str());
+        console_printf("%s on #%s: %s\n",
+                       getDisplayName(packet.from).c_str(),
+                       getChannelName(packet.channel).c_str(),
+                       message.c_str());
         if ((packet.channel == 0) || (packet.channel == 1)) {
             string msg = message;
             transform(msg.begin(), msg.end(), msg.begin(),
@@ -69,12 +69,12 @@ void MeshRoom::gotTextMessage(const meshtastic_MeshPacket &packet,
             if (!reply.empty()) {
                 result = textMessage(0xffffffffU, packet.channel, reply);
                 if (result == false) {
-                    serial_printf(uart0, "textMessage '%s' failed!\n",
-                                  reply.c_str());
+                    console_printf("textMessage '%s' failed!\n",
+                                   reply.c_str());
                 } else {
-                    serial_printf(uart0, "my reply to %s: %s\n",
-                                  getDisplayName(packet.from).c_str(),
-                                  reply.c_str());
+                    console_printf("my reply to %s: %s\n",
+                                   getDisplayName(packet.from).c_str(),
+                                   reply.c_str());
                 }
             }
         }
@@ -98,8 +98,7 @@ void MeshRoom::gotRouting(const meshtastic_MeshPacket &packet,
     if ((routing.which_variant == meshtastic_Routing_error_reason_tag) &&
         (routing.error_reason == meshtastic_Routing_Error_NONE) &&
         (packet.from != packet.to)) {
-        serial_printf(uart0,
-                      "traceroute from %s -> %s[%.2fdB]\n",
+        console_printf("traceroute from %s -> %s[%.2fdB]\n",
                       getDisplayName(packet.from).c_str(),
                       packet.rx_snr);
     }
@@ -112,25 +111,25 @@ void MeshRoom::gotTraceRoute(const meshtastic_MeshPacket &packet,
     if ((routeDiscovery.route_count > 0) &&
         (routeDiscovery.route_back_count == 0)) {
         float rx_snr;
-        serial_printf(uart0, "traceroute from %s -> ",
-                      getDisplayName(packet.from).c_str());
+        console_printf("traceroute from %s -> ",
+                       getDisplayName(packet.from).c_str());
         for (unsigned int i = 0; i < routeDiscovery.route_count; i++) {
             if (i > 0) {
-                serial_printf(uart0, " -> ");
+                console_printf(" -> ");
             }
-            serial_printf(uart0, "%s",
-                          getDisplayName(routeDiscovery.route[i]).c_str());
+            console_printf("%s",
+                           getDisplayName(routeDiscovery.route[i]).c_str());
             if (routeDiscovery.snr_towards[i] != INT8_MIN) {
                 rx_snr = routeDiscovery.snr_towards[i];
                 rx_snr /= 4.0;
-                serial_printf(uart0, "[%.2fdB]", rx_snr);
+                console_printf("[%.2fdB]", rx_snr);
             } else {
-                serial_printf(uart0, "[???dB]");
+                console_printf("[???dB]");
             }
         }
         rx_snr = packet.rx_snr;
-        serial_printf(uart0, " -> %s[%.2fdB]\n",
-                      getDisplayName(packet.to).c_str(), rx_snr);
+        console_printf(" -> %s[%.2fdB]\n",
+                       getDisplayName(packet.to).c_str(), rx_snr);
     }
 }
 

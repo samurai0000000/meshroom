@@ -10,10 +10,10 @@
 #include <stdarg.h>
 #include <strings.h>
 #include <unistd.h>
+#include <pico/stdio.h>
 #include <hardware/uart.h>
 #include <hardware/gpio.h>
 #include <hardware/sync.h>
-#include <hardware/watchdog.h>
 #include <meshroom.h>
 
 #define UART0_TX_PIN      0
@@ -37,9 +37,11 @@ struct serial_buf {
     char buf[SERIAL_BUF_BUF_SIZE];
 };
 
-#define SERIAL_PBUF_SIZE  256
 
+#if !defined(LIB_PICO_STDIO_USB)
+#define SERIAL_PBUF_SIZE  256
 static char pbuf[SERIAL_PBUF_SIZE];
+#endif
 
 static struct serial_buf serial_buf[2] = {
     {
@@ -58,6 +60,7 @@ static void serial_interrupt_handler(void)
     unsigned int wp;
     char *dst;
 
+#if !defined(LIB_PICO_STDIO_USB)
     dst = serial_buf[0].buf;
     wp = serial_buf[0].wp;
     while (uart_is_readable(uart0)) {
@@ -65,6 +68,7 @@ static void serial_interrupt_handler(void)
         wp = ((wp + 1) % SERIAL_BUF_BUF_SIZE);
     }
     serial_buf[0].wp = wp;
+#endif
 
     dst = serial_buf[1].buf;
     wp = serial_buf[1].wp;
@@ -79,6 +83,7 @@ static void serial_interrupt_handler(void)
 
 void serial_init(void)
 {
+#if !defined(LIB_PICO_STDIO_USB)
     uart_init(uart0, UART0_BAUD_RATE);
     gpio_set_function(UART0_TX_PIN, GPIO_FUNC_UART);
     gpio_set_function(UART0_RX_PIN, GPIO_FUNC_UART);
@@ -88,6 +93,7 @@ void serial_init(void)
     irq_set_exclusive_handler(UART0_IRQ, serial_interrupt_handler);
     irq_set_enabled(UART0_IRQ, true);
     uart_set_irq_enables(uart0, true, false);
+#endif
 
     uart_init(uart1, UART1_BAUD_RATE);
     gpio_set_function(UART1_TX_PIN, GPIO_FUNC_UART);
@@ -100,7 +106,7 @@ void serial_init(void)
     uart_set_irq_enables(uart1, true, false);
 }
 
-int serial_write(uart_inst_t *uart, const void *_buf, size_t len)
+static int __serial_write(uart_inst_t *uart, const void *_buf, size_t len)
 {
     int ret = 0;
     const uint8_t *buf = (const uint8_t *) _buf;
@@ -124,7 +130,7 @@ done:
     return ret;
 }
 
-int serial_rx_ready(uart_inst_t *uart)
+static int __serial_rx_ready(uart_inst_t *uart)
 {
     int ret = 0;
     int chan = -1;
@@ -152,7 +158,7 @@ done:
     return ret;
 }
 
-int serial_read(uart_inst_t *uart, void *buf, size_t len)
+static int __serial_read(uart_inst_t *uart, void *buf, size_t len)
 {
     int ret = 0;
     int chan = -1;
@@ -190,36 +196,78 @@ done:
     return ret;
 }
 
-int serial_print_str(uart_inst_t *uart, const char *str)
-{
-    int ret = 0;
-
-    while (*str != '\0') {
-        if (*str == '\n') {
-            while (serial_write(uart, "\r", 1) != 1);
-        }
-
-        while (serial_write(uart, str, 1) != 1);
-
-        ret++;
-        str++;
-    }
-
-    return ret;
-}
-
-int serial_printf(uart_inst_t *uart, const char *fmt, ...)
+int console_printf(const char *fmt, ...)
 {
     int ret;
     va_list ap;
 
+#if !defined(LIB_PICO_STDIO_USB)
     va_start(ap, fmt);
     ret = vsnprintf(pbuf, SERIAL_PBUF_SIZE - 1, fmt, ap);
     va_end(ap);
 
-    ret = serial_print_str(uart, pbuf);
+    for (int i = 0; i < ret; i++) {
+        if (pbuf[i] == '\n') {
+            while (__serial_write(uart0, "\r", 1) != 1);
+        }
+
+        while (__serial_write(uart0, pbuf + i, 1) != 1);
+    }
+#else
+    va_start(ap, fmt);
+    ret = vprintf(fmt, ap);
+    va_end(ap);
+    stdio_flush();
+#endif
 
     return ret;
+}
+
+int console_rx_ready(void)
+{
+#if !defined(LIB_PICO_STDIO_USB)
+    return __serial_rx_ready(uart0);
+#else
+    return 1;
+#endif
+}
+
+int console_read(uint8_t *data, size_t size)
+{
+#if !defined(LIB_PICO_STDIO_USB)
+    return __serial_read(uart0, data, size);
+#else
+    int ret = 0;
+
+    while (size > 0) {
+        int c = stdio_getchar_timeout_us(0);
+        if (c == PICO_ERROR_TIMEOUT) {
+            break;
+        } else {
+            *data = (char) c;
+            data++;
+            size--;
+            ret++;
+        }
+    }
+
+    return ret;
+#endif
+}
+
+int serial_write(const void *buf, size_t len)
+{
+    return __serial_write(uart1, buf, len);
+}
+
+int serial_rx_ready(void)
+{
+    return __serial_rx_ready(uart1);
+}
+
+int serial_read(void *buf, size_t len)
+{
+    return __serial_read(uart1, buf, len);
 }
 
 /*

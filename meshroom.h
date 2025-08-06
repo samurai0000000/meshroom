@@ -38,7 +38,7 @@ extern void led_init(void);
 extern void led_set(bool on);
 
 extern void shell_init(void);
-extern void shell_process(void);
+extern int shell_process(void);
 
 EXTERN_C_END
 

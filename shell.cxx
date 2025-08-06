@@ -19,8 +19,6 @@
 #include <MeshRoom.hxx>
 #include "version.h"
 
-#define shell_printf(...) serial_printf(uart0, __VA_ARGS__)
-
 #define CMDLINE_SIZE 256
 
 struct inproc {
@@ -41,9 +39,9 @@ static int version(int argc, char **argv)
     (void)(argc);
     (void)(argv);
 
-    serial_printf(uart0, "Version: %s\n", MYPROJECT_VERSION_STRING);
-    serial_printf(uart0, "Built: %s@%s %s\n",
-                  MYPROJECT_WHOAMI, MYPROJECT_HOSTNAME, MYPROJECT_DATE);
+    console_printf("Version: %s\n", MYPROJECT_VERSION_STRING);
+    console_printf("Built: %s@%s %s\n",
+                   MYPROJECT_WHOAMI, MYPROJECT_HOSTNAME, MYPROJECT_DATE);
 
     return 0;
 }
@@ -68,25 +66,25 @@ static int system(int argc, char **argv)
     hour = (uptime / 3600) % 24;
     days = (uptime) / 86400;
     if (days == 0) {
-        serial_printf(uart0, "  Up-time:  %.2u:%.2u:%.2u",
-                      hour, min, sec);
+        console_printf("   Up-time: %.2u:%.2u:%.2u",
+                       hour, min, sec);
     } else {
-        serial_printf(uart0, "  Up-time:  %ud %.2u:%.2u:%.2u",
-                      days, hour, min, sec);
+        console_printf("   Up-time: %ud %.2u:%.2u:%.2u",
+                       days, hour, min, sec);
     }
     if (watchdog_caused_reboot()) {
-        serial_printf(uart0, " (rebooted by watchdog timer)\n");
+        console_printf(" (rebooted by watchdog timer)\n");
     } else {
-        serial_printf(uart0, "\n");
+        console_printf("\n");
     }
 #if defined(MEASURE_CPU_UTILIZATION)
-    serial_printf(uart0, " CPU Util.: %7.3f%%\n",
-                  ((float) t_cpu_busy) / ((float) t_cpu_total) * 100.0);
+    console_printf(" CPU Util.: %7.3f%%\n",
+                   ((float) t_cpu_busy) / ((float) t_cpu_total) * 100.0);
 #endif
-    serial_printf(uart0, "Stack Size: %8u bytes\n", stack_size);
-    serial_printf(uart0, "Total Heap: %8u bytes\n", total_heap);
-    serial_printf(uart0, " Free Heap: %8u bytes\n", free_heap);
-    serial_printf(uart0, " Used Heap: %8u bytes\n", used_heap);
+    console_printf("Stack Size: %8u bytes\n", stack_size);
+    console_printf("Total Heap: %8u bytes\n", total_heap);
+    console_printf(" Free Heap: %8u bytes\n", free_heap);
+    console_printf(" Used Heap: %8u bytes\n", used_heap);
 
     return 0;
 }
@@ -97,7 +95,7 @@ static int bootsel(int argc, char **argv)
     (void)(argv);
 
     meshroom->sendDisconnect();
-    serial_printf(uart0, "Rebooting to BOOTSEL mode\n");
+    console_printf("Rebooting to BOOTSEL mode\n");
     reset_usb_boot(0, 0);
 
     return 0;
@@ -123,56 +121,56 @@ static int status(int argc, char **argv)
     (void)(argv);
 
     if (!meshroom->isConnected()) {
-        serial_printf(uart0, "Not connected\n");
+        console_printf("Not connected\n");
     } else {
         unsigned int i;
 
-        serial_printf(uart0, "Me: %s %s\n",
-                      meshroom->getDisplayName(meshroom->whoami()).c_str(),
-                      meshroom->lookupLongName(meshroom->whoami()).c_str());
+        console_printf("Me: %s %s\n",
+                       meshroom->getDisplayName(meshroom->whoami()).c_str(),
+                       meshroom->lookupLongName(meshroom->whoami()).c_str());
 
-        serial_printf(uart0, "Channels: %d\n",
-                      meshroom->channels().size());
+        console_printf("Channels: %d\n",
+                       meshroom->channels().size());
         for (map<uint8_t, meshtastic_Channel>::const_iterator it =
                  meshroom->channels().begin();
              it != meshroom->channels().end(); it++) {
             if (it->second.has_settings &&
                 it->second.role != meshtastic_Channel_Role_DISABLED) {
-                serial_printf(uart0, "chan#%u: %s\n",
-                              (unsigned int) it->second.index,
-                              it->second.settings.name);
+                console_printf("chan#%u: %s\n",
+                               (unsigned int) it->second.index,
+                               it->second.settings.name);
             }
         }
 
-        serial_printf(uart0, "Nodes: %d seen\n",
-                      meshroom->nodeInfos().size());
+        console_printf("Nodes: %d seen\n",
+                       meshroom->nodeInfos().size());
         i = 0;
         for (map<uint32_t, meshtastic_NodeInfo>::const_iterator it =
                  meshroom->nodeInfos().begin();
              it != meshroom->nodeInfos().end(); it++, i++) {
             if ((i % 4) == 0) {
-                serial_printf(uart0, "  ");
+                console_printf("  ");
             }
-            serial_printf(uart0, "%16s  ",
-                          meshroom->getDisplayName(it->second.num).c_str());
+            console_printf("%16s  ",
+                           meshroom->getDisplayName(it->second.num).c_str());
             if ((i % 4) == 3) {
-                serial_printf(uart0, "\n");
+                console_printf("\n");
             }
         }
         if ((i % 4) != 0) {
-            serial_printf(uart0, "\n");
+            console_printf("\n");
         }
 
         map<uint32_t, meshtastic_DeviceMetrics>::const_iterator dev;
         dev = meshroom->deviceMetrics().find(meshroom->whoami());
         if (dev != meshroom->deviceMetrics().end()) {
             if (dev->second.has_channel_utilization) {
-                serial_printf(uart0, "channel_utilization: %.2f\n",
-                              dev->second.channel_utilization);
+                console_printf("channel_utilization: %.2f\n",
+                               dev->second.channel_utilization);
             }
             if (dev->second.has_air_util_tx) {
-                serial_printf(uart0, "air_util_tx: %.2f\n",
-                              dev->second.air_util_tx);
+                console_printf("air_util_tx: %.2f\n",
+                               dev->second.air_util_tx);
             }
         }
 
@@ -180,16 +178,16 @@ static int status(int argc, char **argv)
         env = meshroom->environmentMetrics().find(meshroom->whoami());
         if (env != meshroom->environmentMetrics().end()) {
             if (env->second.has_temperature) {
-                serial_printf(uart0, "temperature: %.2f\n",
-                              env->second.temperature);
+                console_printf("temperature: %.2f\n",
+                               env->second.temperature);
             }
             if (env->second.has_relative_humidity) {
-                serial_printf(uart0, "relative_humidity: %.2f\n",
-                              env->second.relative_humidity);
+                console_printf("relative_humidity: %.2f\n",
+                               env->second.relative_humidity);
             }
             if (env->second.has_barometric_pressure) {
-                serial_printf(uart0, "barometric_pressure: %.2f\n",
-                              env->second.barometric_pressure);
+                console_printf("barometric_pressure: %.2f\n",
+                               env->second.barometric_pressure);
             }
         }
     }
@@ -205,7 +203,7 @@ static int want_config(int argc, char **argv)
     (void)(argv);
 
     if (meshroom->sendWantConfig() != true) {
-        serial_printf(uart0, "failed!\n");
+        console_printf("failed!\n");
         ret = -1;
     }
 
@@ -214,13 +212,13 @@ static int want_config(int argc, char **argv)
 
 static int disconnect(int argc, char **argv)
 {
-   int ret = 0;
+    int ret = 0;
 
     (void)(argc);
     (void)(argv);
 
     if (meshroom->sendDisconnect() != true) {
-        serial_printf(uart0, "failed!\n");
+        console_printf("failed!\n");
         ret = -1;
     }
 
@@ -229,13 +227,13 @@ static int disconnect(int argc, char **argv)
 
 static int heartbeat(int argc, char **argv)
 {
-   int ret = 0;
+    int ret = 0;
 
     (void)(argc);
     (void)(argv);
 
     if (meshroom->sendHeartbeat() != true) {
-        serial_printf(uart0, "failed!\n", ret);
+        console_printf("failed!\n", ret);
         ret = -1;
     }
 
@@ -249,14 +247,14 @@ static int direct_message(int argc, char **argv)
     string message;
 
     if (argc < 3) {
-        serial_printf(uart0, "Usage: %s [name] message\n", argv[0]);
+        console_printf("Usage: %s [name] message\n", argv[0]);
         ret = -1;
         goto done;
     }
 
     dest = meshroom->getId(argv[1]);
     if ((dest == 0xffffffffU) || (dest == meshroom->whoami())) {
-        serial_printf(uart0, "name '%s' is invalid!\n", argv[1]);
+        console_printf("name '%s' is invalid!\n", argv[1]);
         ret = -1;
         goto done;
     }
@@ -267,7 +265,7 @@ static int direct_message(int argc, char **argv)
     }
 
     if (meshroom->textMessage(dest, 0x0U, message) != true) {
-        serial_printf(uart0, "failed!\n");
+        console_printf("failed!\n");
         ret = -1;
         goto done;
     }
@@ -286,14 +284,14 @@ static int channel_message(int argc, char **argv)
     string message;
 
     if (argc < 3) {
-        serial_printf(uart0, "Usage: %s [chan] message\n", argv[0]);
+        console_printf("Usage: %s [chan] message\n", argv[0]);
         ret = -1;
         goto done;
     }
 
     channel = meshroom->getChannel(argv[1]);
     if (channel == 0xffU) {
-        serial_printf(uart0, "channel '%s' is invalid!\n", argv[1]);
+        console_printf("channel '%s' is invalid!\n", argv[1]);
         ret = -1;
         goto done;
     }
@@ -304,7 +302,7 @@ static int channel_message(int argc, char **argv)
     }
 
     if (meshroom->textMessage(0xffffffffU, channel, message) != true) {
-        serial_printf(uart0, "failed!\n");
+        console_printf("failed!\n");
         ret = -1;
         goto done;
     }
@@ -340,22 +338,22 @@ static int help(int argc, char **argv)
     (void)(argc);
     (void)(argv);
 
-    shell_printf("Available commands:\n");
+    console_printf("Available commands:\n");
 
     for (i = 0; cmd_handlers[i].name && cmd_handlers[i].f; i++) {
         if ((i % 4) == 0) {
-            shell_printf("\t");
+            console_printf("\t");
         }
 
-        shell_printf("%s\t", cmd_handlers[i].name);
+        console_printf("%s\t", cmd_handlers[i].name);
 
         if ((i % 4) == 3) {
-            shell_printf("\n");
+            console_printf("\n");
         }
     }
 
     if ((i % 4) != 0) {
-        shell_printf("\n");
+        console_printf("\n");
     }
 
     return 0;
@@ -404,7 +402,7 @@ static void execute_cmdline(char *cmdline)
         }
     }
 
-    shell_printf("Unknown command: '%s'!\n", argv[0]);
+    console_printf("Unknown command: '%s'!\n", argv[0]);
 
 done:
 
@@ -414,39 +412,48 @@ done:
 void shell_init(void)
 {
     bzero(&inproc, sizeof(inproc));
-
-    serial_print_str(uart0, "> ");
+    console_printf("> ");
 }
 
-void shell_process(void)
+int shell_process(void)
 {
+    int ret = 0;
+    int rx;
     char c;
 
-    while (serial_rx_ready(uart0) > 0) {
-        serial_read(uart0, &c, 1);
+    while (console_rx_ready() > 0) {
+        rx = console_read((uint8_t *) &c, 1);
+        if (rx == 0) {
+            break;
+        }
+
+        ret += rx;
+
         if (c == '\r') {
             inproc.cmdline[inproc.i] = '\0';
-            serial_print_str(uart0, "\n");
+            console_printf("\n");
             execute_cmdline(inproc.cmdline);
-            serial_print_str(uart0, "> ");
+            console_printf("> ");
             inproc.i = 0;
             inproc.cmdline[0] = '\0';
         } else if ((c == '\x7f') || (c == '\x08')) {
             if (inproc.i > 0) {
-                shell_printf("\b \b");
+                console_printf("\b \b");
                 inproc.i--;
             }
         } else if (c == '\x03') {
-            shell_printf("^C\n> ");
+            console_printf("^C\n> ");
             inproc.i = 0;
         } else if ((c != '\n') && isprint(c)) {
             if (inproc.i < (CMDLINE_SIZE - 1)) {
-                serial_write(uart0, &c, 1);
+                console_printf("%c", c);
                 inproc.cmdline[inproc.i] = c;
                 inproc.i++;
             }
         }
     }
+
+    return ret;
 }
 
 /*

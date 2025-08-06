@@ -46,26 +46,31 @@ int main(void)
     stdio_init_all();
 
     serial_init();
-    serial_printf(uart0, "\n\x1b[2K");
-    serial_printf(uart0, "The meshroom firmware for Raspberry Pi Pico\n");
-    serial_printf(uart0, "Version: %s\n", MYPROJECT_VERSION_STRING);
-    serial_printf(uart0, "Built: %s@%s %s\n",
-                  MYPROJECT_WHOAMI, MYPROJECT_HOSTNAME, MYPROJECT_DATE);
-    serial_printf(uart0, "-------------------------------------------\n");
-    serial_printf(uart0, "Copyright (C) 2025, Charles Chiou\n");
-
     led_init();
 
     meshroom = make_shared<MeshRoom>();
     meshroom->sendDisconnect();
-    sleep_ms(250);
 
-    shell_init();
+#if defined(LIB_PICO_STDIO_USB)
+    sleep_ms(1500);
+#else
+    sleep_ms(200);
+#endif
+
+    console_printf("\n\x1b[2K");
+    console_printf("The meshroom firmware for Raspberry Pi Pico\n");
+    console_printf("Version: %s\n", MYPROJECT_VERSION_STRING);
+    console_printf("Built: %s@%s %s\n",
+                   MYPROJECT_WHOAMI, MYPROJECT_HOSTNAME, MYPROJECT_DATE);
+    console_printf("-------------------------------------------\n");
+    console_printf("Copyright (C) 2025, Charles Chiou\n");
 
 #if defined(USE_WATCHDOG_TIMER)
     watchdog_enable(5000, true);
     watchdog_enable_caused_reboot();
 #endif
+
+    shell_init();
 
     now = time(NULL);
     last_flip = now;
@@ -86,7 +91,7 @@ int main(void)
         if (!meshroom->isConnected() && ((now - last_want_config) >= 5)) {
             ret = meshroom->sendWantConfig();
             if (ret == false) {
-                serial_printf(uart0, "sendWantConfig failed!\n");
+                console_printf("sendWantConfig failed!\n");
             }
 
             last_want_config = now;
@@ -97,23 +102,23 @@ int main(void)
         if (meshroom->isConnected() && ((now - last_heartbeat) >= 60)) {
             ret = meshroom->sendHeartbeat();
             if (ret == false) {
-                serial_printf(uart0, "sendHeartbeat failed!\n");
+                console_printf("sendHeartbeat failed!\n");
             }
 
             last_heartbeat = now;
         }
 
         do {
-            rx0 = serial_rx_ready(uart0);
+            rx0 = console_rx_ready();
             if (rx0 > 0) {
-                shell_process();
+                rx0 = shell_process();
             }
 
-            rx1 = serial_rx_ready(uart1);
+            rx1 = serial_rx_ready();
             if (rx1 > 0) {
                 ret = mt_serial_process(&meshroom->_mtc, 0);
                 if (ret < 0) {
-                    serial_printf(uart0, "mt_serial_process failed!\n");
+                    console_printf("mt_serial_process failed!\n");
                 }
             }
 
