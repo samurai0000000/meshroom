@@ -39,20 +39,22 @@ struct serial_buf {
 
 
 #if !defined(LIB_PICO_STDIO_USB)
+
 #define SERIAL_PBUF_SIZE  256
 static char pbuf[SERIAL_PBUF_SIZE];
-#endif
 
-static struct serial_buf serial_buf[2] = {
-    {
-        .rp = 0,
-        .wp = 0,
-        .buf = { 0, },
-    }, {
-        .rp = 0,
-        .wp = 0,
-        .buf = { 0, },
-    },
+static struct serial_buf uart0_buf = {
+    .rp = 0,
+    .wp = 0,
+    .buf = { 0, },
+};
+
+#endif  // LIB_PICO_STDIO_USB
+
+static struct serial_buf uart1_buf = {
+    .rp = 0,
+    .wp = 0,
+    .buf = { 0, },
 };
 
 static void serial_interrupt_handler(void)
@@ -61,22 +63,22 @@ static void serial_interrupt_handler(void)
     char *dst;
 
 #if !defined(LIB_PICO_STDIO_USB)
-    dst = serial_buf[0].buf;
-    wp = serial_buf[0].wp;
+    dst = uart0_buf.buf;
+    wp = uart0_buf.wp;
     while (uart_is_readable(uart0)) {
         dst[wp] = (char) uart_get_hw(uart0)->dr;
         wp = ((wp + 1) % SERIAL_BUF_BUF_SIZE);
     }
-    serial_buf[0].wp = wp;
+    uart0_buf.wp = wp;
 #endif
 
-    dst = serial_buf[1].buf;
-    wp = serial_buf[1].wp;
+    dst = uart1_buf.buf;
+    wp = uart1_buf.wp;
     while (uart_is_readable(uart1)) {
         dst[wp] = (char) uart_get_hw(uart1)->dr;
         wp = ((wp + 1) % SERIAL_BUF_BUF_SIZE);
     }
-    serial_buf[1].wp = wp;
+    uart1_buf.wp = wp;
 
     __sev();
 }
@@ -133,24 +135,26 @@ done:
 static int __serial_rx_ready(uart_inst_t *uart)
 {
     int ret = 0;
-    int chan = -1;
+    struct serial_buf *serial_buf = NULL;
 
     if (uart == uart0) {
-        chan = 0;
+#if !defined(LIB_PICO_STDIO_USB)
+        serial_buf = &uart0_buf;
+#else
+        ret = -1;
+        goto done;
+#endif
     } else if (uart == uart1) {
-        chan = 1;
+        serial_buf = &uart1_buf;
     } else {
         ret = -1;
         goto done;
     }
 
-    if (serial_buf[chan].wp < serial_buf[chan].rp) {
-        ret =
-            SERIAL_BUF_BUF_SIZE -
-            serial_buf[chan].rp +
-            serial_buf[chan].wp;
+    if (serial_buf->wp < serial_buf->rp) {
+        ret = SERIAL_BUF_BUF_SIZE - serial_buf->rp + serial_buf->wp;
     } else {
-        ret = serial_buf[chan].wp - serial_buf[chan].rp;
+        ret = serial_buf->wp - serial_buf->rp;
     }
 
 done:
@@ -161,26 +165,31 @@ done:
 static int __serial_read(uart_inst_t *uart, void *buf, size_t len)
 {
     int ret = 0;
-    int chan = -1;
+    struct serial_buf *serial_buf = NULL;
     uint8_t *dst;
     const uint8_t *src;
     unsigned int rp, wp;
     size_t size;
 
     if (uart == uart0) {
-        chan = 0;
+#if !defined(LIB_PICO_STDIO_USB)
+        serial_buf = &uart0_buf;
+#else
+        ret = -1;
+        goto done;
+#endif
     } else if (uart == uart1) {
-        chan = 1;
+        serial_buf = &uart1_buf;
     } else {
         ret = -1;
         goto done;
     }
 
     dst = (uint8_t *) buf;
-    src = (const uint8_t *) serial_buf[chan].buf;
+    src = (const uint8_t *) serial_buf->buf;
     size = SERIAL_BUF_BUF_SIZE;
-    rp = serial_buf[chan].rp;
-    wp = serial_buf[chan].wp;
+    rp = serial_buf->rp;
+    wp = serial_buf->wp;
     while ((len > 0) && (rp != wp)) {
         *dst = src[rp];
         dst++;
@@ -189,7 +198,7 @@ static int __serial_read(uart_inst_t *uart, void *buf, size_t len)
         rp = (rp + 1) % size;
     }
 
-    serial_buf[chan].rp = rp;
+    serial_buf->rp = rp;
 
 done:
 
