@@ -16,7 +16,7 @@
 #include <meshroom.h>
 #include "version.h"
 
-//#define USE_WATCHDOG_TIMER
+#define USE_WATCHDOG_TIMER
 
 #if defined(MEASURE_CPU_UTILIZATION)
 uint64_t t_cpu_total = 0;
@@ -49,6 +49,7 @@ int main(void)
     led_init();
 
     meshroom = make_shared<MeshRoom>();
+    meshroom->setClient(meshroom);
     meshroom->sendDisconnect();
 
 #if defined(LIB_PICO_STDIO_USB)

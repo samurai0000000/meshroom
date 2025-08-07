@@ -11,7 +11,8 @@ EXTERN_C_BEGIN
 
 extern void serial_init(void);
 
-extern int console_printf(const char *fmt, ...);
+extern int console_printf(const char *format, ...);
+extern int console_vprintf(const char *format, va_list ap);
 extern int console_rx_ready(void);
 extern int console_read(uint8_t *data, size_t size);
 

@@ -205,15 +205,24 @@ done:
     return ret;
 }
 
-int console_printf(const char *fmt, ...)
+int console_printf(const char *format, ...)
 {
     int ret;
     va_list ap;
 
-#if !defined(LIB_PICO_STDIO_USB)
-    va_start(ap, fmt);
-    ret = vsnprintf(pbuf, SERIAL_PBUF_SIZE - 1, fmt, ap);
+    va_start(ap, format);
+    ret = console_vprintf(format, ap);
     va_end(ap);
+
+    return ret;
+}
+
+int console_vprintf(const char *format, va_list ap)
+{
+    int ret;
+
+#if !defined(LIB_PICO_STDIO_USB)
+    ret = vsnprintf(pbuf, SERIAL_PBUF_SIZE - 1, format, ap);
 
     for (int i = 0; i < ret; i++) {
         if (pbuf[i] == '\n') {
@@ -223,9 +232,7 @@ int console_printf(const char *fmt, ...)
         while (__serial_write(uart0, pbuf + i, 1) != 1);
     }
 #else
-    va_start(ap, fmt);
-    ret = vprintf(fmt, ap);
-    va_end(ap);
+    ret = vprintf(format, ap);
     stdio_flush();
 #endif
 

@@ -8,13 +8,15 @@
 #define MESHROOM_HXX
 
 #include <SimpleClient.hxx>
+#include <HomeChat.hxx>
 
 using namespace std;
 
 /*
  * Suitable for use on resource-constraint MCU platforms.
  */
-class MeshRoom : public SimpleClient {
+class MeshRoom : public SimpleClient, public HomeChat,
+                 public enable_shared_from_this<MeshRoom> {
 
 public:
 
@@ -31,6 +33,10 @@ protected:
                             const meshtastic_Routing &routing);
     virtual void gotTraceRoute(const meshtastic_MeshPacket &packet,
                                const meshtastic_RouteDiscovery &routeDiscovery);
+
+protected:
+
+    virtual int vprintf(const char *format, va_list ap) const;
 
 };
 

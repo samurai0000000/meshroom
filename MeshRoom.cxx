@@ -5,6 +5,7 @@
  */
 
 #include <stddef.h>
+#include <stdarg.h>
 #include <hardware/uart.h>
 #include <algorithm>
 #include <meshroom.h>
@@ -24,60 +25,12 @@ MeshRoom::~MeshRoom()
 void MeshRoom::gotTextMessage(const meshtastic_MeshPacket &packet,
                               const string &message)
 {
-    SimpleClient::gotTextMessage(packet, message);
-    string reply;
     bool result = false;
+    SimpleClient::gotTextMessage(packet, message);
 
-    if (packet.to == whoami()) {
-        console_printf("%s: %s\n",
-                       getDisplayName(packet.from).c_str(), message.c_str());
-
-        reply = lookupShortName(packet.from) + ", you said '" + message + "'!";
-        if (reply.size() > 200) {
-            reply = "oopsie daisie!";
-        }
-
-        result = textMessage(packet.from, packet.channel, reply);
-        if (result == false) {
-            console_printf("textMessage '%s' failed!\n",
-                           reply.c_str());
-        } else {
-            console_printf("my_reply to %s: %s\n",
-                           getDisplayName(packet.from).c_str(),
-                           reply.c_str());
-        }
-    } else {
-        console_printf("%s on #%s: %s\n",
-                       getDisplayName(packet.from).c_str(),
-                       getChannelName(packet.channel).c_str(),
-                       message.c_str());
-        if ((packet.channel == 0) || (packet.channel == 1)) {
-            string msg = message;
-            transform(msg.begin(), msg.end(), msg.begin(),
-                      [](unsigned char c) {
-                          return tolower(c); });
-            if (msg.find("hello") != string::npos) {
-                reply = "greetings, " + lookupShortName(packet.from) + "!";
-            } else if (msg.find(lookupShortName(whoami())) != string::npos) {
-                reply = lookupShortName(packet.from) + ", you said '" +
-                    message + "'!";
-                if (reply.size() > 200) {
-                    reply = "oopsie daisie!";
-                }
-            }
-
-            if (!reply.empty()) {
-                result = textMessage(0xffffffffU, packet.channel, reply);
-                if (result == false) {
-                    console_printf("textMessage '%s' failed!\n",
-                                   reply.c_str());
-                } else {
-                    console_printf("my reply to %s: %s\n",
-                                   getDisplayName(packet.from).c_str(),
-                                   reply.c_str());
-                }
-            }
-        }
+    result = handleTextMessage(packet, message);
+    if (result) {
+        return;
     }
 }
 
@@ -131,6 +84,11 @@ void MeshRoom::gotTraceRoute(const meshtastic_MeshPacket &packet,
         console_printf(" -> %s[%.2fdB]\n",
                        getDisplayName(packet.to).c_str(), rx_snr);
     }
+}
+
+int MeshRoom::vprintf(const char *format, va_list ap) const
+{
+    return console_vprintf(format, ap);
 }
 
 /*
