@@ -314,6 +314,307 @@ done:
     return ret;
 }
 
+static int ir(int argc, char **argv)
+{
+    int ret = 0;
+    uint32_t ir_flags = meshroom->ir_flags();
+
+    if (argc == 1) {
+        console_printf("infrared:");
+        if (ir_flags & MESHROOM_IR_SONY_BRAVIA) {
+            console_printf(" sony_bravia ");
+        }
+        if (ir_flags & MESHROOM_IR_SAMSUNG_TV) {
+            console_printf(" samsung_tv ");
+        }
+        if (ir_flags & MESHROOM_IR_PANASONIC_AC) {
+            console_printf(" panasonic_ac ");
+        }
+        console_printf("\n");
+    } else if ((argc == 3) && strcmp(argv[1], "add") == 0) {
+        if (strstr(argv[2], "bravia") != NULL) {
+            ir_flags |= MESHROOM_IR_SONY_BRAVIA;
+        } else if (strstr(argv[2], "samsung") != NULL) {
+            ir_flags |= MESHROOM_IR_SAMSUNG_TV;
+        } else if (strstr(argv[2], "panasonic") != NULL) {
+            ir_flags |= MESHROOM_IR_PANASONIC_AC;
+        } else {
+            console_printf("failed!\n");
+            ret = -1;
+            goto done;
+        }
+        meshroom->set_ir_flags(ir_flags);
+        console_printf("ok\n");
+    } else if ((argc == 3) && strcmp(argv[1], "del") == 0) {
+        if (strstr(argv[2], "bravia") != NULL) {
+            ir_flags &= ~MESHROOM_IR_SONY_BRAVIA;
+        } else if (strstr(argv[2], "samsung") != NULL) {
+            ir_flags &= ~MESHROOM_IR_SAMSUNG_TV;
+        } else if (strstr(argv[2], "panasonic") != NULL) {
+            ir_flags &= ~MESHROOM_IR_PANASONIC_AC;
+        } else {
+            console_printf("failed!\n");
+            ret = -1;
+            goto done;
+        }
+        meshroom->set_ir_flags(ir_flags);
+        console_printf("ok\n");
+    } else {
+        console_printf("syntax error!\n");
+        ret = -1;
+    }
+
+done:
+
+    return ret;
+}
+
+static int authchan(int argc, char **argv)
+{
+    int ret = 0;
+    bool result;
+
+    if (argc == 1) {
+        console_printf("list of authchans:\n");
+        for (unsigned int i = 0; i < meshroom->nvmAuthchans().size(); i++) {
+            console_printf("  %s\n", meshroom->nvmAuthchans()[i].name);
+        }
+    } else if ((argc == 3) && strcmp(argv[1], "add") == 0) {
+        result = meshroom->addNvmAuthChannel(argv[2], *meshroom);
+        if (result == false) {
+            console_printf("addNvmAuthChannel failed!\n");
+            ret = -1;
+            goto done;
+        }
+        result = meshroom->applyNvmToHomeChat();
+        if (result == false) {
+            console_printf("applyNvmToHomeChat failed!\n");
+            ret = -1;
+            goto done;
+        }
+        result = meshroom->saveNvm();
+        if (result == false) {
+            console_printf("saveNvm failed!\n");
+            ret = -1;
+            goto done;
+        }
+        console_printf("ok\n");
+    } else if ((argc == 3) && strcmp(argv[1], "del") == 0) {
+        result = meshroom->delNvmAuthChannel(argv[2]);
+        if (result == false) {
+            console_printf("delNvmAuthChannel failed!\n");
+            ret = -1;
+            goto done;
+        }
+        result = meshroom->applyNvmToHomeChat();
+        if (result == false) {
+            console_printf("applyNvmToHomeChat failed!\n");
+            ret = -1;
+            goto done;
+        }
+        result = meshroom->saveNvm();
+        if (result == false) {
+            console_printf("saveNvm failed!\n");
+            ret = -1;
+            goto done;
+        }
+        console_printf("ok\n");
+    } else {
+        console_printf("syntax error!\n");
+        ret = -1;
+        goto done;
+    }
+
+    ret = 0;
+
+done:
+
+    return ret;
+}
+
+static int authchans(int argc, char **argv)
+{
+    argc = 1;
+    return authchan(argc, argv);
+}
+
+static int admin(int argc, char **argv)
+{
+    int ret = 0;
+    bool result;
+
+    if (argc == 1) {
+        unsigned int i;
+        console_printf("list of admins:\n");
+        for (i = 0; i < meshroom->nvmAdmins().size(); i++) {
+            uint32_t node_num = meshroom->nvmAdmins()[i].node_num;
+            if ((i % 4) == 0) {
+                console_printf("  ");
+            }
+            console_printf("%16s  ",
+                           meshroom->getDisplayName(node_num).c_str());
+            if ((i % 4) == 3) {
+                console_printf("\n");
+            }
+        }
+        if ((i % 4) != 0) {
+            console_printf("\n");
+        }
+    } else if ((argc == 3) && strcmp(argv[1], "add") == 0) {
+        result = meshroom->addNvmAdmin(argv[2], *meshroom);
+        if (result == false) {
+            console_printf("addNvmAdmin failed!\n");
+            ret = -1;
+            goto done;
+        }
+        result = meshroom->applyNvmToHomeChat();
+        if (result == false) {
+            console_printf("applyNvmToHomeChat failed!\n");
+            ret = -1;
+            goto done;
+        }
+        result = meshroom->saveNvm();
+        if (result == false) {
+            console_printf("saveNvm failed!\n");
+            ret = -1;
+            goto done;
+        }
+        console_printf("ok\n");
+    } else if ((argc == 3) && strcmp(argv[1], "del") == 0) {
+        result = meshroom->delNvmAdmin(argv[2], *meshroom);
+        if (result == false) {
+            console_printf("delNvmAdmin failed!\n");
+            ret = -1;
+            goto done;
+        }
+        result = meshroom->applyNvmToHomeChat();
+        if (result == false) {
+            console_printf("applyNvmToHomeChat failed!\n");
+            ret = -1;
+            goto done;
+        }
+        result = meshroom->saveNvm();
+        if (result == false) {
+            console_printf("saveNvm failed!\n");
+            ret = -1;
+            goto done;
+        }
+        console_printf("ok\n");
+    } else {
+        console_printf("syntax error!\n");
+        ret = -1;
+        goto done;
+    }
+
+    ret = 0;
+
+done:
+
+    return ret;
+}
+
+static int admins(int argc, char **argv)
+{
+    argc = 1;
+    return admin(argc, argv);
+}
+
+static int mate(int argc, char **argv)
+{
+    int ret = 0;
+    bool result;
+
+    if (argc == 1) {
+        unsigned int i;
+        console_printf("list of mates:\n");
+        for (i = 0; i < meshroom->nvmMates().size(); i++) {
+            uint32_t node_num = meshroom->nvmMates()[i].node_num;
+            if ((i % 4) == 0) {
+                console_printf("  ");
+            }
+            console_printf("%16s  ",
+                           meshroom->getDisplayName(node_num).c_str());
+            if ((i % 4) == 3) {
+                console_printf("\n");
+            }
+        }
+        if ((i % 4) != 0) {
+            console_printf("\n");
+        }
+    } else if ((argc == 3) && strcmp(argv[1], "add") == 0) {
+        result = meshroom->addNvmMate(argv[2], *meshroom);
+        if (result == false) {
+            console_printf("addNvmMate failed!\n");
+            ret = -1;
+            goto done;
+        }
+        result = meshroom->applyNvmToHomeChat();
+        if (result == false) {
+            console_printf("applyNvmToHomeChat failed!\n");
+            ret = -1;
+            goto done;
+        }
+        result = meshroom->saveNvm();
+        if (result == false) {
+            console_printf("saveNvm failed!\n");
+            ret = -1;
+            goto done;
+        }
+        console_printf("ok\n");
+    } else if ((argc == 3) && strcmp(argv[1], "del") == 0) {
+        result = meshroom->delNvmMate(argv[2], *meshroom);
+        if (result == false) {
+            console_printf("delNvmMate failed!\n");
+            ret = -1;
+            goto done;
+        }
+        result = meshroom->applyNvmToHomeChat();
+        if (result == false) {
+            console_printf("applyNvmToHomeChat failed!\n");
+            ret = -1;
+            goto done;
+        }
+        result = meshroom->saveNvm();
+        if (result == false) {
+            console_printf("saveNvm failed!\n");
+            ret = -1;
+            goto done;
+        }
+        console_printf("ok\n");
+    } else {
+        console_printf("syntax error!\n");
+        ret = -1;
+        goto done;
+    }
+
+    ret = 0;
+
+done:
+
+    return ret;
+}
+
+static int mates(int argc, char **argv)
+{
+    argc = 1;
+    return mate(argc, argv);
+}
+
+static int nvm(int argc, char **argv)
+{
+    if (argc != 1) {
+        console_printf("syntax error!\n");
+        return -1;
+    }
+
+    ir(argc, argv);
+    authchan(argc, argv);
+    admin(argc, argv);
+    mate(argc, argv);
+
+    return 0;
+}
+
 static int help(int argc, char **argv);
 
 static struct cmd_handler cmd_handlers[] = {
@@ -328,6 +629,13 @@ static struct cmd_handler cmd_handlers[] = {
     { "heartbeat", heartbeat, },
     { "dm", direct_message },
     { "cm", channel_message, },
+    { "authchan", authchan, },
+    { "authchans", authchans, },
+    { "admin", admin, },
+    { "admins", admins, },
+    { "mate", mate, },
+    { "mates", mates, },
+    { "nvm", nvm, },
     { NULL, NULL, },
 };
 

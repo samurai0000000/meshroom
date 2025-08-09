@@ -51,6 +51,10 @@ int main(void)
     meshroom = make_shared<MeshRoom>();
     meshroom->setClient(meshroom);
     meshroom->sendDisconnect();
+    if (meshroom->loadNvm() == false) {
+        meshroom->saveNvm();  // Create a default
+    }
+    meshroom->applyNvmToHomeChat();
 
 #if defined(LIB_PICO_STDIO_USB)
     sleep_ms(1500);
