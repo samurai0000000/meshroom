@@ -85,6 +85,9 @@ static int system(int argc, char **argv)
     console_printf("Total Heap: %8u bytes\n", total_heap);
     console_printf(" Free Heap: %8u bytes\n", free_heap);
     console_printf(" Used Heap: %8u bytes\n", used_heap);
+    if (serial_rx_overflow > 0) {
+        console_printf(" Serial RX Overflow: %u\n", serial_rx_overflow);
+    }
 
     return 0;
 }
@@ -629,6 +632,7 @@ static struct cmd_handler cmd_handlers[] = {
     { "heartbeat", heartbeat, },
     { "dm", direct_message },
     { "cm", channel_message, },
+    { "ir", ir, },
     { "authchan", authchan, },
     { "authchans", authchans, },
     { "admin", admin, },

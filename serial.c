@@ -29,7 +29,9 @@
 #define UART_STOP_BITS    1
 #define UART_PARITY       UART_PARITY_NONE
 
-#define SERIAL_BUF_BUF_SIZE  32
+#define SERIAL_BUF_BUF_SIZE  256
+
+unsigned int serial_rx_overflow = 0;
 
 struct serial_buf {
     unsigned int rp;
@@ -59,7 +61,7 @@ static struct serial_buf uart1_buf = {
 
 static void serial_interrupt_handler(void)
 {
-    unsigned int wp;
+    unsigned int rp, wp;
     char *dst;
 
 #if !defined(LIB_PICO_STDIO_USB)
@@ -73,10 +75,14 @@ static void serial_interrupt_handler(void)
 #endif
 
     dst = uart1_buf.buf;
+    rp = uart1_buf.wp;
     wp = uart1_buf.wp;
     while (uart_is_readable(uart1)) {
         dst[wp] = (char) uart_get_hw(uart1)->dr;
         wp = ((wp + 1) % SERIAL_BUF_BUF_SIZE);
+        if (wp == rp) {
+            serial_rx_overflow++;
+        }
     }
     uart1_buf.wp = wp;
 
@@ -141,7 +147,7 @@ static int __serial_rx_ready(uart_inst_t *uart)
 #if !defined(LIB_PICO_STDIO_USB)
         serial_buf = &uart0_buf;
 #else
-        ret = -1;
+        ret = 1;
         goto done;
 #endif
     } else if (uart == uart1) {
@@ -175,7 +181,7 @@ static int __serial_read(uart_inst_t *uart, void *buf, size_t len)
 #if !defined(LIB_PICO_STDIO_USB)
         serial_buf = &uart0_buf;
 #else
-        ret = -1;
+        ret = 0;
         goto done;
 #endif
     } else if (uart == uart1) {
@@ -232,8 +238,7 @@ int console_vprintf(const char *format, va_list ap)
         while (__serial_write(uart0, pbuf + i, 1) != 1);
     }
 #else
-    ret = vprintf(format, ap);
-    stdio_flush();
+    ret = stdio_vprintf(format, ap);
 #endif
 
     return ret;

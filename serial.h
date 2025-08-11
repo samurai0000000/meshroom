@@ -20,6 +20,8 @@ extern int serial_write(const void *buf, size_t len);
 extern int serial_rx_ready(void);
 extern int serial_read(void *buf, size_t len);
 
+extern unsigned int serial_rx_overflow;
+
 EXTERN_C_END
 
 #endif

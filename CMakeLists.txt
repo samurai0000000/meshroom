@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.13)
 
 include (pico-sdk/external/pico_sdk_import.cmake)
 
-project(meshmon VERSION 1.3.0 LANGUAGES C CXX ASM)
+project(meshmon VERSION 1.3.1 LANGUAGES C CXX ASM)
 
 pico_sdk_init()
 
