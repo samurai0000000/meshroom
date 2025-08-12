@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.13)
 
 include (pico-sdk/external/pico_sdk_import.cmake)
 
-project(meshmon VERSION 1.3.1 LANGUAGES C CXX ASM)
+project(meshmon VERSION 1.3.2 LANGUAGES C CXX ASM)
 
 pico_sdk_init()
 
@@ -20,7 +20,7 @@ add_compile_options(-Wall -Wextra -Werror)
 add_compile_options(-g -O2)
 
 set(PICO_USE_STACK_GUARDS 1)
-set(PICO_STACK_SIZE 12288)
+set(PICO_STACK_SIZE 16384)
 
 set(WHOAMI_OUTPUT)
 execute_process(

@@ -29,7 +29,7 @@
 #define UART_STOP_BITS    1
 #define UART_PARITY       UART_PARITY_NONE
 
-#define SERIAL_BUF_BUF_SIZE  256
+#define SERIAL_BUF_BUF_SIZE  512
 
 unsigned int serial_rx_overflow = 0;
 
@@ -82,6 +82,7 @@ static void serial_interrupt_handler(void)
         wp = ((wp + 1) % SERIAL_BUF_BUF_SIZE);
         if (wp == rp) {
             serial_rx_overflow++;
+            break;
         }
     }
     uart1_buf.wp = wp;
