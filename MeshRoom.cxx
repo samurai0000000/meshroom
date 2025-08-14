@@ -55,9 +55,9 @@ void MeshRoom::gotRouting(const meshtastic_MeshPacket &packet,
     if ((routing.which_variant == meshtastic_Routing_error_reason_tag) &&
         (routing.error_reason == meshtastic_Routing_Error_NONE) &&
         (packet.from != packet.to)) {
-        console_printf("traceroute from %s -> %s[%.2fdB]\n",
-                      getDisplayName(packet.from).c_str(),
-                      packet.rx_snr);
+        consoles_printf("traceroute from %s -> %s[%.2fdB]\n",
+                        getDisplayName(packet.from).c_str(),
+                        packet.rx_snr);
     }
 }
 
@@ -68,25 +68,25 @@ void MeshRoom::gotTraceRoute(const meshtastic_MeshPacket &packet,
     if ((routeDiscovery.route_count > 0) &&
         (routeDiscovery.route_back_count == 0)) {
         float rx_snr;
-        console_printf("traceroute from %s -> ",
-                       getDisplayName(packet.from).c_str());
+        consoles_printf("traceroute from %s -> ",
+                        getDisplayName(packet.from).c_str());
         for (unsigned int i = 0; i < routeDiscovery.route_count; i++) {
             if (i > 0) {
-                console_printf(" -> ");
+                consoles_printf(" -> ");
             }
-            console_printf("%s",
-                           getDisplayName(routeDiscovery.route[i]).c_str());
+            consoles_printf("%s",
+                            getDisplayName(routeDiscovery.route[i]).c_str());
             if (routeDiscovery.snr_towards[i] != INT8_MIN) {
                 rx_snr = routeDiscovery.snr_towards[i];
                 rx_snr /= 4.0;
-                console_printf("[%.2fdB]", rx_snr);
+                consoles_printf("[%.2fdB]", rx_snr);
             } else {
-                console_printf("[???dB]");
+                consoles_printf("[???dB]");
             }
         }
         rx_snr = packet.rx_snr;
-        console_printf(" -> %s[%.2fdB]\n",
-                       getDisplayName(packet.to).c_str(), rx_snr);
+        consoles_printf(" -> %s[%.2fdB]\n",
+                        getDisplayName(packet.to).c_str(), rx_snr);
     }
 }
 
@@ -103,7 +103,7 @@ string MeshRoom::handleMeshAuth(uint32_t node_num, const string &message)
 
 int MeshRoom::vprintf(const char *format, va_list ap) const
 {
-    return console_vprintf(format, ap);
+    return consoles_vprintf(format, ap);
 }
 
 #define FLASH_TARGET_SIZE   (FLASH_SECTOR_SIZE * 2)
@@ -123,7 +123,7 @@ bool MeshRoom::loadNvm(void)
 
     header = (const struct nvm_header *) (XIP_BASE + FLASH_TARGET_OFFSET);
     if (header->magic != NVM_HEADER_MAGIC) {
-        console_printf("Wrong header magic!\n");
+        consoles_printf("Wrong header magic!\n");
         result = false;
         goto done;
     }
@@ -138,7 +138,7 @@ bool MeshRoom::loadNvm(void)
         (main_body->n_mates * sizeof(struct nvm_mate_entry)) +
         sizeof(struct nvm_footer);
     if (size > FLASH_TARGET_SIZE) {
-        console_printf("Too big size=%zu!\n", size);
+        consoles_printf("Too big size=%zu!\n", size);
         result = false;
         goto done;
     }
@@ -154,7 +154,7 @@ bool MeshRoom::loadNvm(void)
         (((uint8_t *) mates) +
          (sizeof(struct nvm_mate_entry) * main_body->n_mates));
     if (footer->magic != NVM_FOOTER_MAGIC) {
-        console_printf("Wrong footer magic!\n");
+        consoles_printf("Wrong footer magic!\n");
         result = false;
         goto done;
     }

@@ -7,6 +7,9 @@ MAKEFLAGS =	--no-print-dir
 PICO_SDK_PATH :=	$(realpath pico-sdk)
 export PICO_SDK_PATH
 
+FREERTOS_KERNEL_PATH :=	$(realpath FreeRTOS-Kernel)
+export FREERTOS_KERNEL_PATH
+
 TARGETS +=	build/meshroom.uf2
 
 .PHONY: default clean distclean $(TARGETS)

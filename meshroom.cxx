@@ -7,9 +7,13 @@
 #include <time.h>
 #include <pico/stdlib.h>
 #include <pico/time.h>
+#include <pico/multicore.h>
 #include <hardware/uart.h>
 #include <hardware/sync.h>
 #include <hardware/watchdog.h>
+#include <FreeRTOS.h>
+#include <task.h>
+#include <semphr.h>
 #include <libmeshtastic.h>
 #include <memory>
 #include <MeshRoom.hxx>
@@ -18,49 +22,43 @@
 
 #define USE_WATCHDOG_TIMER
 
-#if defined(MEASURE_CPU_UTILIZATION)
-uint64_t t_cpu_total = 0;
-uint64_t t_cpu_busy = 0;
-static uint64_t t_busy = time_us_64(), t_idle = 0, t_diff = 0;
-#endif
+#define LED_TASK_STACK_SIZE            configMINIMAL_STACK_SIZE
+#define LED_TASK_PRIORITY              (tskIDLE_PRIORITY + 1UL)
+#define CONSOLE_TASK_STACK_SIZE        (4 * 1024)
+#define CONSOLE_TASK_PRIORITY          (tskIDLE_PRIORITY + 2UL)
+#define CONSOLE2_TASK_STACK_SIZE       (4 * 1024)
+#define CONSOLE2_TASK_PRIORITY         (tskIDLE_PRIORITY + 3UL)
+#define MESHTASTIC_TASK_STACK_SIZE     (16 * 1024)
+#define MESHTASTIC_TASK_PRIORITY       (tskIDLE_PRIORITY + 4UL)
 
 shared_ptr<MeshRoom> meshroom = NULL;
 
-static bool timer_handler(repeating_timer_t *timer)
+void led_task(__unused void *params)
 {
-    (void)(timer);
+    bool led_on = false;
 
-    __sev();
+#if defined(USE_WATCHDOG_TIMER)
+    watchdog_enable(5000, true);
+    watchdog_enable_caused_reboot();
+#endif
 
-    return true;
+    for (;;) {
+        led_set(led_on);
+        led_on = !led_on;
+        vTaskDelay(1000);
+
+#if defined(USE_WATCHDOG_TIMER)
+        watchdog_update();
+#endif
+    }
 }
 
-int main(void)
+void console_task(__unused void *params)
 {
-    int ret = 0;
-    repeating_timer_t timer;
-    bool led_on = false;
-    time_t now, last_flip, last_want_config, last_heartbeat;
-    int rx0 = 0, rx1 = 0;
+    int ret;
 
-    stdio_init_all();
-
-    serial_init();
-    led_init();
-
-    meshroom = make_shared<MeshRoom>();
-    meshroom->setClient(meshroom);
-    meshroom->sendDisconnect();
-    if (meshroom->loadNvm() == false) {
-        meshroom->saveNvm();  // Create a default
-    }
-    meshroom->applyNvmToHomeChat();
-
-#if defined(LIB_PICO_STDIO_USB)
-    sleep_ms(1500);
-#else
-    sleep_ms(200);
-#endif
+    vTaskSetThreadLocalStoragePointer(NULL, 1, (void *) 0);
+    vTaskDelay(1500);
 
     console_printf("\n\x1b[2K");
     console_printf("The meshroom firmware for Raspberry Pi Pico\n");
@@ -69,29 +67,62 @@ int main(void)
                    MYPROJECT_WHOAMI, MYPROJECT_HOSTNAME, MYPROJECT_DATE);
     console_printf("-------------------------------------------\n");
     console_printf("Copyright (C) 2025, Charles Chiou\n");
+    console_printf("> ");
 
-#if defined(USE_WATCHDOG_TIMER)
-    watchdog_enable(5000, true);
-    watchdog_enable_caused_reboot();
-#endif
+    for (;;) {
+        ret = console_rx_ready();
+        if (ret > 0) {
+            ret = shell_process();
+        }
 
-    shell_init();
+        if (ret == 0) {
+            vTaskDelay(50);
+        }
+    }
+}
+
+
+void console2_task(__unused void *params)
+{
+    int ret;
+
+    vTaskSetThreadLocalStoragePointer(NULL, 0, (void *) 1);
+
+    console2_printf("\n\x1b[2K");
+    console2_printf("The meshroom firmware for Raspberry Pi Pico\n");
+    console2_printf("Version: %s\n", MYPROJECT_VERSION_STRING);
+    console2_printf("Built: %s@%s %s\n",
+                   MYPROJECT_WHOAMI, MYPROJECT_HOSTNAME, MYPROJECT_DATE);
+    console2_printf("-------------------------------------------\n");
+    console2_printf("Copyright (C) 2025, Charles Chiou\n");
+    console2_printf("> ");
+
+    for (;;) {
+        ret = console2_rx_ready();
+        if (ret > 0) {
+            ret = shell2_process();
+        }
+
+        if (ret == 0) {
+            vTaskDelay(50);
+        }
+    }
+}
+
+void meshtastic_task(__unused void *params)
+{
+    int ret = 0;
+    time_t now, last_want_config, last_heartbeat;
+    extern SemaphoreHandle_t uart1_sem;
 
     now = time(NULL);
-    last_flip = now;
     last_heartbeat = now;
     last_want_config = 0;
 
-    add_repeating_timer_us(-1000000, timer_handler, NULL, &timer);
+    vTaskDelay(5000);
 
     for (;;) {
         now = time(NULL);
-
-        if ((now - last_flip) >= 1) {
-            led_set(led_on);
-            led_on = !led_on;
-            last_flip = now;
-        }
 
         if (!meshroom->isConnected() && ((now - last_want_config) >= 5)) {
             ret = meshroom->sendWantConfig();
@@ -113,57 +144,80 @@ int main(void)
             last_heartbeat = now;
         }
 
-        do {
-            rx0 = console_rx_ready();
-            if (rx0 > 0) {
-                rx0 = shell_process();
-            }
-
-            rx1 = serial_rx_ready();
-            if (rx1 > 0) {
+        for (;;) {
+            ret = serial_rx_ready();
+            if (ret == 0) {
+                break;
+            } if (ret > 0) {
                 ret = mt_serial_process(&meshroom->_mtc, 0);
                 if (ret < 0) {
                     console_printf("mt_serial_process failed!\n");
                 }
             }
-
-#if defined(USE_WATCHDOG_TIMER)
-            watchdog_update();
-#endif
-        } while ((rx0 > 0) || (rx1 > 0));
-
-#if defined(MEASURE_CPU_UTILIZATION)
-        t_idle = time_us_64();
-        t_diff = t_idle - t_busy;
-        t_cpu_total += t_diff;
-        t_cpu_busy += t_diff;
-#endif
-
-        __wfe();
-#if defined(USE_WATCHDOG_TIMER)
-        watchdog_update();
-#endif
-
-#if defined(MEASURE_CPU_UTILIZATION)
-        t_busy = time_us_64();
-        t_diff = t_busy - t_idle;
-        t_cpu_total += t_diff;
-
-        if (t_cpu_total > (5 * 1000000)) {
-            t_cpu_total /= 2;
-            t_cpu_busy /= 2;
         }
+
+        while (xSemaphoreTake(uart1_sem, portMAX_DELAY) != pdTRUE);
+    }
+}
+
+int main(void)
+{
+    TaskHandle_t ledTask;
+    TaskHandle_t consoleTask;
+    TaskHandle_t console2Task;
+    TaskHandle_t meshtasticTask;
+
+    stdio_init_all();
+    serial_init();
+    led_init();
+    shell_init();
+
+    meshroom = make_shared<MeshRoom>();
+    meshroom->setClient(meshroom);
+    meshroom->sendDisconnect();
+    if (meshroom->loadNvm() == false) {
+        meshroom->saveNvm();  // Create a default
+    }
+    meshroom->applyNvmToHomeChat();
+
+    xTaskCreate(led_task,
+                "LedTask",
+                LED_TASK_STACK_SIZE,
+                NULL,
+                LED_TASK_PRIORITY,
+                &ledTask);
+
+    xTaskCreate(console_task,
+                "ConsoleTask",
+                CONSOLE_TASK_STACK_SIZE,
+                NULL,
+                CONSOLE_TASK_PRIORITY,
+                &consoleTask);
+
+    xTaskCreate(console2_task,
+                "Console2Task",
+                CONSOLE2_TASK_STACK_SIZE,
+                NULL,
+                CONSOLE2_TASK_PRIORITY,
+                &console2Task);
+
+    xTaskCreate(meshtastic_task,
+                "MeshtasticThread",
+                MESHTASTIC_TASK_STACK_SIZE,
+                NULL,
+                MESHTASTIC_TASK_PRIORITY,
+                &meshtasticTask);
+
+#if defined(configUSE_CORE_AFFINITY) && (configNUMBER_OF_CORES > 1)
+    vTaskCoreAffinitySet(ledTask, 1);
+    vTaskCoreAffinitySet(consoleTask, 1);
+    vTaskCoreAffinitySet(console2Task, 1);
+    vTaskCoreAffinitySet(meshtasticTask, 1);
 #endif
-    }
 
-    /* Should not get here... */
-    for (;;) {
-        led_set(led_on);
-        led_on = !led_on;
-        sleep_ms(100);
-    }
+    vTaskStartScheduler();
 
-    return ret;
+    return 0;
 }
 
 /*
