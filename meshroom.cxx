@@ -112,19 +112,20 @@ void console2_task(__unused void *params)
 void meshtastic_task(__unused void *params)
 {
     int ret = 0;
-    time_t now, last_want_config, last_heartbeat;
+    uint64_t now, last_want_config, last_heartbeat;
     extern SemaphoreHandle_t uart1_sem;
 
-    now = time(NULL);
+    now = time_us_64();
     last_heartbeat = now;
     last_want_config = 0;
 
     vTaskDelay(5000);
 
     for (;;) {
-        now = time(NULL);
+        now = time_us_64();
 
-        if (!meshroom->isConnected() && ((now - last_want_config) >= 5)) {
+        if (!meshroom->isConnected() &&
+            ((now - last_want_config) >= 5000000)) {
             ret = meshroom->sendWantConfig();
             if (ret == false) {
                 console_printf("sendWantConfig failed!\n");
@@ -135,7 +136,8 @@ void meshtastic_task(__unused void *params)
             last_want_config = now;
         }
 
-        if (meshroom->isConnected() && ((now - last_heartbeat) >= 60)) {
+        if (meshroom->isConnected() &&
+            ((now - last_heartbeat) >= 60000000)) {
             ret = meshroom->sendHeartbeat();
             if (ret == false) {
                 console_printf("sendHeartbeat failed!\n");
@@ -156,7 +158,7 @@ void meshtastic_task(__unused void *params)
             }
         }
 
-        while (xSemaphoreTake(uart1_sem, portMAX_DELAY) != pdTRUE);
+        xSemaphoreTake(uart1_sem, 1000);
     }
 }
 
@@ -209,10 +211,10 @@ int main(void)
                 &meshtasticTask);
 
 #if defined(configUSE_CORE_AFFINITY) && (configNUMBER_OF_CORES > 1)
-    vTaskCoreAffinitySet(ledTask, 1);
-    vTaskCoreAffinitySet(consoleTask, 1);
-    vTaskCoreAffinitySet(console2Task, 1);
-    vTaskCoreAffinitySet(meshtasticTask, 1);
+    vTaskCoreAffinitySet(ledTask, 0x2);
+    vTaskCoreAffinitySet(consoleTask, 0x2);
+    vTaskCoreAffinitySet(console2Task, 0x2);
+    vTaskCoreAffinitySet(meshtasticTask, 0x1);
 #endif
 
     vTaskStartScheduler();

@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.13)
 
 include (pico-sdk/external/pico_sdk_import.cmake)
 
-project(meshmon VERSION 1.4.0 LANGUAGES C CXX ASM)
+project(meshmon VERSION 1.4.1 LANGUAGES C CXX ASM)
 include(FreeRTOS_Kernel_import.cmake)
 
 pico_sdk_init()
@@ -17,17 +17,12 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
 include_directories(${CMAKE_CURRENT_LIST_DIR})
-add_compile_options(-Wall -Wextra -Werror)
+add_compile_options(-Wall -Wextra -Werror -Wno-unused-variable)
 add_compile_options(-g -O2)
 
 set(PICO_USE_STACK_GUARDS 1)
-if (DEFINED ENV{FREERTOS_KERNEL_PATH})
-  add_compile_options(-Wno-unused-variable)
-  set(PICO_STACK_SIZE 2048)
-  set(PICO_CORE1_STACK_SIZE 2048)
-else ()
-  set(PICO_STACK_SIZE 16384)
-endif ()
+set(PICO_STACK_SIZE 2048)
+set(PICO_CORE1_STACK_SIZE 2048)
 
 set(WHOAMI_OUTPUT)
 execute_process(
@@ -72,5 +67,6 @@ target_link_libraries(meshroom
   libmeshtastic
   FreeRTOS-Kernel-Heap4
   pico_stdlib
+  pico_multicore
   )
 pico_add_extra_outputs(meshroom)

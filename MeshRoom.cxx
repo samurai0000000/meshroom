@@ -7,7 +7,10 @@
 #include <stddef.h>
 #include <stdarg.h>
 #include <hardware/sync.h>
+#include <pico/flash.h>
 #include <hardware/flash.h>
+#include <FreeRTOS.h>
+#include <task.h>
 #include <algorithm>
 #include <meshroom.h>
 #include <MeshRoom.hxx>
@@ -179,6 +182,19 @@ done:
     return result;
 }
 
+struct nvm_write_params {
+    const uint8_t *buf;
+    size_t size;
+};
+
+static void write_to_nvm(void *args)
+{
+    struct nvm_write_params *params = (struct nvm_write_params *) args;
+
+    flash_range_erase(FLASH_TARGET_OFFSET, FLASH_TARGET_SIZE);
+    flash_range_program(FLASH_TARGET_OFFSET, params->buf, params->size);
+}
+
 bool MeshRoom::saveNvm(void)
 {
     bool result = false;
@@ -191,7 +207,7 @@ bool MeshRoom::saveNvm(void)
     struct nvm_mate_entry *mates = NULL;
     struct nvm_footer *footer = NULL;
     unsigned int i;
-    uint32_t state;
+    struct nvm_write_params params;
 
     _main_body.n_authchans = nvmAuthchans().size();
     _main_body.n_admins = nvmAdmins().size();
@@ -205,7 +221,7 @@ bool MeshRoom::saveNvm(void)
         (sizeof(struct nvm_mate_entry) * _main_body.n_mates) +
         sizeof(struct nvm_footer);
 
-    buf = (uint8_t *) malloc(size);
+    buf = (uint8_t *) pvPortMalloc(size);
     if (buf == NULL) {
         result = false;
         goto done;
@@ -244,17 +260,18 @@ bool MeshRoom::saveNvm(void)
     footer->magic = NVM_FOOTER_MAGIC;
     footer->crc32 = 0;
 
-    state = save_and_disable_interrupts();
-    flash_range_erase(FLASH_TARGET_OFFSET, FLASH_TARGET_SIZE);
-    flash_range_program(FLASH_TARGET_OFFSET, buf, size);
-    restore_interrupts(state);
+    params.buf = buf;
+    params.size = size;
+    flash_safe_execute_core_init();
+    flash_safe_execute(write_to_nvm, &params, 1000);
+    flash_safe_execute_core_deinit();
 
     result = true;
 
 done:
 
     if (buf) {
-        free(buf);
+        vPortFree(buf);
     }
 
     return result;
