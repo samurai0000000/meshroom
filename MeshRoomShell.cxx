@@ -34,6 +34,20 @@ MeshRoomShell::~MeshRoomShell()
 
 }
 
+int MeshRoomShell::tx_write(const uint8_t *buf, size_t size)
+{
+    int ret;
+    int console_id = (int) _ctx;
+
+    if (console_id == 0) {
+        ret = console_write(buf, size);
+    } else {
+        ret = console2_write(buf, size);
+    }
+
+    return ret;
+}
+
 int MeshRoomShell::printf(const char *format, ...)
 {
     int ret = 0;

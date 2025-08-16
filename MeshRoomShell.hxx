@@ -21,6 +21,7 @@ public:
 
 protected:
 
+    virtual int tx_write(const uint8_t *buf, size_t size);
     virtual int printf(const char *format, ...);
     virtual int rx_ready(void) const;
     virtual int rx_read(uint8_t *buf, size_t size);

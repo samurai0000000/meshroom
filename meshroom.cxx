@@ -33,16 +33,17 @@
 #define MESHTASTIC_TASK_PRIORITY       (tskIDLE_PRIORITY + 4UL)
 
 shared_ptr<MeshRoom> meshroom = NULL;
-shared_ptr<MeshRoomShell> shell = NULL;
-shared_ptr<MeshRoomShell> shell2 = NULL;
+static shared_ptr<MeshRoomShell> shell = NULL;
+static shared_ptr<MeshRoomShell> shell2 = NULL;
 
-string banner = "The meshroom firmware for Raspberry Pi Pico";
-string version = string("Version: ") + string(MYPROJECT_VERSION_STRING);
-string built = string("Built: ") + string(MYPROJECT_WHOAMI) + string("@") +
+static string banner = "The meshroom firmware for Raspberry Pi Pico";
+static string version = string("Version: ") + string(MYPROJECT_VERSION_STRING);
+static string built = string("Built: ") +
+    string(MYPROJECT_WHOAMI) + string("@") +
     string(MYPROJECT_HOSTNAME) + string(" ") + string(MYPROJECT_DATE);
-string copyright = string("Copyright (C) 2025, Charles Chiou");
+static string copyright = string("Copyright (C) 2025, Charles Chiou");
 
-void led_task(__unused void *params)
+static void led_task(__unused void *params)
 {
     bool led_on = false;
 
@@ -62,7 +63,7 @@ void led_task(__unused void *params)
     }
 }
 
-void console_task(__unused void *params)
+static void console_task(__unused void *params)
 {
     int ret;
 
@@ -85,7 +86,7 @@ void console_task(__unused void *params)
     }
 }
 
-void console2_task(__unused void *params)
+static void console2_task(__unused void *params)
 {
     int ret;
 
@@ -106,7 +107,7 @@ void console2_task(__unused void *params)
     }
 }
 
-void meshtastic_task(__unused void *params)
+static void meshtastic_task(__unused void *params)
 {
     int ret = 0;
     uint64_t now, last_want_config, last_heartbeat;

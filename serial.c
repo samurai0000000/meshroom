@@ -205,6 +205,11 @@ done:
     return ret;
 }
 
+int console_write(const uint8_t *data, size_t size)
+{
+    return stdio_put_string((const char *) data, (int) size, false, false);
+}
+
 int console_printf(const char *format, ...)
 {
     int ret;
@@ -250,6 +255,11 @@ int console_read_timeout_us(uint8_t *data, size_t size,
     }
 
     return ret;
+}
+
+int console2_write(const uint8_t *data, size_t size)
+{
+    return __serial_write(uart0, data, size);
 }
 
 int console2_printf(const char *format, ...)
