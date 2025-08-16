@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.13)
 
 include (pico-sdk/external/pico_sdk_import.cmake)
 
-project(meshmon VERSION 1.4.1 LANGUAGES C CXX ASM)
+project(meshmon VERSION 1.4.2 LANGUAGES C CXX ASM)
 include(FreeRTOS_Kernel_import.cmake)
 
 pico_sdk_init()
@@ -56,8 +56,8 @@ configure_file(
 add_executable(meshroom
   led.c
   serial.c
-  shell.cxx
   MeshRoom.cxx
+  MeshRoomShell.cxx
   meshroom.cxx)
 pico_enable_stdio_usb(meshroom 1)
 pico_enable_stdio_uart(meshroom 0)

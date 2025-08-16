@@ -17,6 +17,7 @@
 #include <libmeshtastic.h>
 #include <memory>
 #include <MeshRoom.hxx>
+#include <MeshRoomShell.hxx>
 #include <meshroom.h>
 #include "version.h"
 
@@ -32,6 +33,14 @@
 #define MESHTASTIC_TASK_PRIORITY       (tskIDLE_PRIORITY + 4UL)
 
 shared_ptr<MeshRoom> meshroom = NULL;
+shared_ptr<MeshRoomShell> shell = NULL;
+shared_ptr<MeshRoomShell> shell2 = NULL;
+
+string banner = "The meshroom firmware for Raspberry Pi Pico";
+string version = string("Version: ") + string(MYPROJECT_VERSION_STRING);
+string built = string("Built: ") + string(MYPROJECT_WHOAMI) + string("@") +
+    string(MYPROJECT_HOSTNAME) + string(" ") + string(MYPROJECT_DATE);
+string copyright = string("Copyright (C) 2025, Charles Chiou");
 
 void led_task(__unused void *params)
 {
@@ -57,55 +66,43 @@ void console_task(__unused void *params)
 {
     int ret;
 
-    vTaskSetThreadLocalStoragePointer(NULL, 1, (void *) 0);
     vTaskDelay(1500);
 
     console_printf("\n\x1b[2K");
-    console_printf("The meshroom firmware for Raspberry Pi Pico\n");
-    console_printf("Version: %s\n", MYPROJECT_VERSION_STRING);
-    console_printf("Built: %s@%s %s\n",
-                   MYPROJECT_WHOAMI, MYPROJECT_HOSTNAME, MYPROJECT_DATE);
+    console_printf("%s\n", shell->banner().c_str());
+    console_printf("%s\n", shell->version().c_str());
+    console_printf("%s\n", shell->built().c_str());
     console_printf("-------------------------------------------\n");
-    console_printf("Copyright (C) 2025, Charles Chiou\n");
+    console_printf("%s\n", shell->copyright().c_str());
     console_printf("> ");
 
     for (;;) {
-        ret = console_rx_ready();
-        if (ret > 0) {
-            ret = shell_process();
-        }
+        do {
+            ret = shell->process();
+        } while (ret > 0);
 
-        if (ret == 0) {
-            vTaskDelay(50);
-        }
+        vTaskDelay(50);
     }
 }
-
 
 void console2_task(__unused void *params)
 {
     int ret;
 
-    vTaskSetThreadLocalStoragePointer(NULL, 0, (void *) 1);
-
     console2_printf("\n\x1b[2K");
-    console2_printf("The meshroom firmware for Raspberry Pi Pico\n");
-    console2_printf("Version: %s\n", MYPROJECT_VERSION_STRING);
-    console2_printf("Built: %s@%s %s\n",
-                   MYPROJECT_WHOAMI, MYPROJECT_HOSTNAME, MYPROJECT_DATE);
+    console2_printf("%s\n", shell2->banner().c_str());
+    console2_printf("%s\n", shell2->version().c_str());
+    console2_printf("%s\n", shell2->built().c_str());
     console2_printf("-------------------------------------------\n");
-    console2_printf("Copyright (C) 2025, Charles Chiou\n");
+    console2_printf("%s\n", shell2->copyright().c_str());
     console2_printf("> ");
 
     for (;;) {
-        ret = console2_rx_ready();
-        if (ret > 0) {
-            ret = shell2_process();
-        }
+        do {
+            ret = shell2->process();
+        } while (ret > 0);
 
-        if (ret == 0) {
-            vTaskDelay(50);
-        }
+        vTaskDelay(50);
     }
 }
 
@@ -172,7 +169,6 @@ int main(void)
     stdio_init_all();
     serial_init();
     led_init();
-    shell_init();
 
     meshroom = make_shared<MeshRoom>();
     meshroom->setClient(meshroom);
@@ -181,6 +177,24 @@ int main(void)
         meshroom->saveNvm();  // Create a default
     }
     meshroom->applyNvmToHomeChat();
+
+    shell = make_shared<MeshRoomShell>();
+    shell->setBanner(banner);
+    shell->setVersion(version);
+    shell->setBuilt(built);
+    shell->setCopyright(copyright);
+    shell->setClient(meshroom);
+    shell->setNVM(meshroom);
+    shell->attach((void *) 0);
+
+    shell2 = make_shared<MeshRoomShell>();
+    shell2->setBanner(banner);
+    shell2->setVersion(version);
+    shell2->setBuilt(built);
+    shell2->setCopyright(copyright);
+    shell2->setClient(meshroom);
+    shell2->setNVM(meshroom);
+    shell2->attach((void *) 1);
 
     xTaskCreate(led_task,
                 "LedTask",
