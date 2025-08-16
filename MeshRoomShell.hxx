@@ -27,6 +27,8 @@ protected:
 
     virtual int system(int argc, char **argv);
     virtual int reboot(int argc, char **argv);
+    virtual int nvm(int argc, char **argv);
+    virtual int ir(int argc, char **argv);
     virtual int bootsel(int argc, char **argv);
     virtual int wcfg(int argc, char **argv);
     virtual int disc(int argc, char **argv);

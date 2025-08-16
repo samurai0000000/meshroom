@@ -22,6 +22,7 @@ extern shared_ptr<MeshRoom> meshroom;
 MeshRoomShell::MeshRoomShell(shared_ptr<SimpleClient> client)
     : SimpleShell(client)
 {
+    _help_list.push_back("ir");
     _help_list.push_back("bootsel");
     _help_list.push_back("wcfg");
     _help_list.push_back("disc");
@@ -78,7 +79,7 @@ int MeshRoomShell::rx_read(uint8_t *buf, size_t size)
     return ret;
 }
 
-int MeshRoomShell::system (int argc, char **argv)
+int MeshRoomShell::system(int argc, char **argv)
 {
     extern char __StackTop, __StackBottom;
     extern char __StackLimit, __bss_end__;
@@ -119,6 +120,77 @@ int MeshRoomShell::bootsel(int argc, char **argv)
     reset_usb_boot(0, 0);
 
     return 0;
+}
+
+int MeshRoomShell::nvm(int argc, char **argv)
+{
+    ir(argc, argv);
+    SimpleShell::nvm(argc, argv);
+
+    return 0;
+}
+
+int MeshRoomShell::ir(int argc, char **argv)
+{
+    int ret = 0;
+    uint32_t ir_flags = meshroom->ir_flags();
+
+    if (argc == 1) {
+        this->printf("infrared:");
+        if (ir_flags & MESHROOM_IR_SONY_BRAVIA) {
+            this->printf(" sony_bravia ");
+        }
+        if (ir_flags & MESHROOM_IR_SAMSUNG_TV) {
+            this->printf(" samsung_tv ");
+        }
+        if (ir_flags & MESHROOM_IR_PANASONIC_AC) {
+            this->printf(" panasonic_ac ");
+        }
+        this->printf("\n");
+    } else if ((argc == 3) && strcmp(argv[1], "add") == 0) {
+        if (strstr(argv[2], "bravia") != NULL) {
+            ir_flags |= MESHROOM_IR_SONY_BRAVIA;
+        } else if (strstr(argv[2], "samsung") != NULL) {
+            ir_flags |= MESHROOM_IR_SAMSUNG_TV;
+        } else if (strstr(argv[2], "panasonic") != NULL) {
+            ir_flags |= MESHROOM_IR_PANASONIC_AC;
+        } else {
+            this->printf("failed!\n");
+            ret = -1;
+            goto done;
+        }
+        meshroom->set_ir_flags(ir_flags);
+        if (meshroom->saveNvm()) {
+            this->printf("ok\n");
+        } else {
+            this->printf("failed!\n");
+        }
+    } else if ((argc == 3) && strcmp(argv[1], "del") == 0) {
+        if (strstr(argv[2], "bravia") != NULL) {
+            ir_flags &= ~MESHROOM_IR_SONY_BRAVIA;
+        } else if (strstr(argv[2], "samsung") != NULL) {
+            ir_flags &= ~MESHROOM_IR_SAMSUNG_TV;
+        } else if (strstr(argv[2], "panasonic") != NULL) {
+            ir_flags &= ~MESHROOM_IR_PANASONIC_AC;
+        } else {
+            this->printf("failed!\n");
+            ret = -1;
+            goto done;
+        }
+        meshroom->set_ir_flags(ir_flags);
+        if (meshroom->saveNvm()) {
+            this->printf("ok\n");
+        } else {
+            this->printf("failed!\n");
+        }
+    } else {
+        this->printf("syntax error!\n");
+        ret = -1;
+    }
+
+done:
+
+    return ret;
 }
 
 int MeshRoomShell::wcfg(int argc, char **argv)
@@ -170,7 +242,9 @@ int MeshRoomShell::unknown_command(int argc, char **argv)
 {
     int ret = 0;
 
-    if (strcmp(argv[0], "bootsel") == 0) {
+    if (strcmp(argv[0], "ir") == 0) {
+        ret = this->ir(argc, argv);
+    } else if (strcmp(argv[0], "bootsel") == 0) {
         ret = this->bootsel(argc, argv);
     } else if (strcmp(argv[0], "wcfg") == 0) {
         ret = this->wcfg(argc, argv);
