@@ -24,9 +24,6 @@ MeshRoomShell::MeshRoomShell(shared_ptr<SimpleClient> client)
 {
     _help_list.push_back("ir");
     _help_list.push_back("bootsel");
-    _help_list.push_back("wcfg");
-    _help_list.push_back("disc");
-    _help_list.push_back("hb");
 }
 
 MeshRoomShell::~MeshRoomShell()
@@ -207,51 +204,6 @@ done:
     return ret;
 }
 
-int MeshRoomShell::wcfg(int argc, char **argv)
-{
-    int ret = 0;
-
-    (void)(argc);
-    (void)(argv);
-
-    if (meshroom->sendWantConfig() != true) {
-        this->printf("failed!\n");
-        ret = -1;
-    }
-
-    return ret;
-}
-
-int MeshRoomShell::disc(int argc, char **argv)
-{
-   int ret = 0;
-
-    (void)(argc);
-    (void)(argv);
-
-    if (meshroom->sendDisconnect() != true) {
-        this->printf("failed!\n");
-        ret = -1;
-    }
-
-    return ret;
-}
-
-int MeshRoomShell::hb(int argc, char **argv)
-{
-   int ret = 0;
-
-    (void)(argc);
-    (void)(argv);
-
-    if (meshroom->sendHeartbeat() != true) {
-        this->printf("failed!\n");
-        ret = -1;
-    }
-
-    return ret;
-}
-
 int MeshRoomShell::unknown_command(int argc, char **argv)
 {
     int ret = 0;
@@ -260,12 +212,6 @@ int MeshRoomShell::unknown_command(int argc, char **argv)
         ret = this->ir(argc, argv);
     } else if (strcmp(argv[0], "bootsel") == 0) {
         ret = this->bootsel(argc, argv);
-    } else if (strcmp(argv[0], "wcfg") == 0) {
-        ret = this->wcfg(argc, argv);
-    } else if (strcmp(argv[0], "disc") == 0) {
-        ret = this->disc(argc, argv);
-    } else if (strcmp(argv[0], "hb") == 0) {
-        ret = this->hb(argc, argv);
     } else {
         this->printf("Unknown command '%s'!\n", argv[0]);
         ret = -1;

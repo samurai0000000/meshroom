@@ -93,17 +93,6 @@ void MeshRoom::gotTraceRoute(const meshtastic_MeshPacket &packet,
     }
 }
 
-string MeshRoom::handleMeshAuth(uint32_t node_num, const string &message)
-{
-    string reply = HomeChat::handleMeshAuth(node_num, message);
-
-    if (reply.empty()) {
-        // Update NVM
-    }
-
-    return reply;
-}
-
 int MeshRoom::vprintf(const char *format, va_list ap) const
 {
     return consoles_vprintf(format, ap);

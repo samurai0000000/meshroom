@@ -31,9 +31,6 @@ protected:
     virtual int nvm(int argc, char **argv);
     virtual int ir(int argc, char **argv);
     virtual int bootsel(int argc, char **argv);
-    virtual int wcfg(int argc, char **argv);
-    virtual int disc(int argc, char **argv);
-    virtual int hb(int argc, char **argv);
     virtual int unknown_command(int argc, char **argv);
 
 };

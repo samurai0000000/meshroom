@@ -49,6 +49,8 @@ public:
 
 protected:
 
+    // Extend SimpleClient
+
     virtual void gotTextMessage(const meshtastic_MeshPacket &packet,
                                 const string &message);
     virtual void gotTelemetry(const meshtastic_MeshPacket &packet,
@@ -60,7 +62,8 @@ protected:
 
 protected:
 
-    virtual string handleMeshAuth(uint32_t node_num, const string &message);
+    // Extend HomeChat
+
     virtual int vprintf(const char *format, va_list ap) const;
 
 public:

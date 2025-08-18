@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.13)
 
 include (pico-sdk/external/pico_sdk_import.cmake)
 
-project(meshmon VERSION 1.4.4 LANGUAGES C CXX ASM)
+project(meshmon VERSION 1.4.5 LANGUAGES C CXX ASM)
 include(FreeRTOS_Kernel_import.cmake)
 
 pico_sdk_init()
@@ -18,7 +18,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 include_directories(${CMAKE_CURRENT_LIST_DIR})
 add_compile_options(-Wall -Wextra -Werror -Wno-unused-variable)
-add_compile_options(-g -O2)
+add_compile_options(-g -Os)
 
 set(PICO_USE_STACK_GUARDS 1)
 set(PICO_STACK_SIZE 2048)
