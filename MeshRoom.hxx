@@ -10,7 +10,7 @@
 #include <vector>
 #include <SimpleClient.hxx>
 #include <HomeChat.hxx>
-#include <BaseNVM.hxx>
+#include <BaseNvm.hxx>
 
 using namespace std;
 
@@ -39,7 +39,7 @@ struct nvm_footer {
 /*
  * Suitable for use on resource-constraint MCU platforms.
  */
-class MeshRoom : public SimpleClient, public HomeChat, public BaseNVM,
+class MeshRoom : public SimpleClient, public HomeChat, public BaseNvm,
                  public enable_shared_from_this<MeshRoom> {
 
 public:

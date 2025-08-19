@@ -16,7 +16,7 @@
 #include <MeshRoom.hxx>
 
 MeshRoom::MeshRoom()
-    : SimpleClient(), HomeChat(), BaseNVM()
+    : SimpleClient(), HomeChat(), BaseNvm()
 {
     bzero(&_main_body, sizeof(_main_body));
     _main_body.ir_flags =

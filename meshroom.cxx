@@ -173,6 +173,7 @@ int main(void)
 
     meshroom = make_shared<MeshRoom>();
     meshroom->setClient(meshroom);
+    meshroom->setNvm(meshroom);
     meshroom->sendDisconnect();
     if (meshroom->loadNvm() == false) {
         meshroom->saveNvm();  // Create a default
@@ -185,7 +186,7 @@ int main(void)
     shell->setBuilt(built);
     shell->setCopyright(copyright);
     shell->setClient(meshroom);
-    shell->setNVM(meshroom);
+    shell->setNvm(meshroom);
     shell->attach((void *) 0);
 
     shell2 = make_shared<MeshRoomShell>();
@@ -194,7 +195,7 @@ int main(void)
     shell2->setBuilt(built);
     shell2->setCopyright(copyright);
     shell2->setClient(meshroom);
-    shell2->setNVM(meshroom);
+    shell2->setNvm(meshroom);
     shell2->attach((void *) 1);
 
     xTaskCreate(led_task,
