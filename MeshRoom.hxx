@@ -12,6 +12,15 @@
 #include <HomeChat.hxx>
 #include <BaseNvm.hxx>
 
+#define PUSHBUTTON_PIN   13
+#define OUTRESET_PIN     14
+#define BUZZER_PIN       15
+#define IR_BLAST_PIN     17
+#define ALERT_LED_PIN    21
+#define ONBOARD_LED_PIN  25
+
+#define PUSHBUTTON_DURATION_THRESHOLD_US 1500000
+
 using namespace std;
 
 struct nvm_header {
@@ -36,6 +45,12 @@ struct nvm_footer {
     uint32_t crc32;
 } __attribute__((packed));
 
+
+struct button_event {
+    uint64_t ts;
+    uint64_t tdur;
+};
+
 /*
  * Suitable for use on resource-constraint MCU platforms.
  */
@@ -46,6 +61,51 @@ public:
 
     MeshRoom();
     ~MeshRoom();
+
+    void tvOnOff(bool onOff);
+    bool tvOnOff(void) const;
+    void tvVol(unsigned int volume);
+    unsigned int tvVol(void) const;
+    void tvChan(unsigned int chan);
+    unsigned int tvChan(void) const;
+
+    enum AcMode {
+        AC_AC,
+        AC_HEATER,
+        AC_DEHUMIDIFIER,
+        AC_AUTO,
+    };
+
+    bool getButtonEvent(struct button_event &event, bool clearOld = false);
+
+    void acOnOff(bool onOff);
+    bool acOnOff(void) const;
+    void acMode(enum AcMode mode);
+    enum AcMode acMode(void) const;
+    string acModeStr(void) const;
+    void acTemp(unsigned int temp);
+    unsigned int acTemp(void) const;
+    void acFanSpeed(unsigned int speed);
+    unsigned int acFanSpeed(void) const;
+    void acFanDir(unsigned int dir);
+    unsigned int acFanDir(void) const;
+
+    void reset(void);
+    unsigned int getResetCount(void) const;
+    time_t getLastReset(void) const;
+
+    void buzz(unsigned int ms = 500);
+    void buzzMorseCode(const string &text, bool clearPrevious = false);
+
+    bool isAlertLedOn(void) const;
+    void setAlertLed(bool onOff);
+    void flipAlertLed(void);
+
+    bool isOnboardLedOn(void) const;
+    void setOnboardLed(bool onOff);
+    void flipOnboardLed(void);
+
+    float getOnboardTempC(void) const;
 
 protected:
 
@@ -64,6 +124,12 @@ protected:
 
     // Extend HomeChat
 
+    virtual string handleUnknown(uint32_t node_num, string &message);
+    virtual string handleEnv(uint32_t node_num, string &message);
+    virtual string handleStatus(uint32_t node_num, string &message);
+    virtual string handleTv(uint32_t node_num, string &message);
+    virtual string handleAc(uint32_t node_num, string &message);
+    virtual string handleReset(uint32_t node_num, string &message);
     virtual int vprintf(const char *format, va_list ap) const;
 
 public:
@@ -82,7 +148,24 @@ public:
 
 private:
 
+    static void gpio_callback(uint gpio, uint32_t events);
+
     struct nvm_main_body _main_body;
+
+    vector<struct button_event> _buttonEvents;
+    bool _tvOnOff;
+    unsigned int _tvVol;
+    unsigned int _tvChan;
+    bool _acOnOff;
+    AcMode _acMode;
+    unsigned int _acTemp;
+    unsigned int _acFanSpeed;
+    unsigned int _acFanDir;
+    unsigned int _resetCount;
+    time_t _lastReset;
+    vector<string> _morseText;
+    bool _alertLed;
+    bool _onboardLed;
 
 };
 

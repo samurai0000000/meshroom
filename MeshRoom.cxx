@@ -6,14 +6,20 @@
 
 #include <stddef.h>
 #include <stdarg.h>
-#include <hardware/sync.h>
+#include <pico/stdlib.h>
 #include <pico/flash.h>
 #include <hardware/flash.h>
+#include <hardware/adc.h>
+#include <hardware/sync.h>
 #include <FreeRTOS.h>
 #include <task.h>
 #include <algorithm>
+#include <sstream>
+#include <iomanip>
 #include <meshroom.h>
 #include <MeshRoom.hxx>
+
+extern shared_ptr<MeshRoom> meshroom;
 
 MeshRoom::MeshRoom()
     : SimpleClient(), HomeChat(), BaseNvm()
@@ -22,11 +28,302 @@ MeshRoom::MeshRoom()
     _main_body.ir_flags =
         MESHROOM_IR_SONY_BRAVIA |
         MESHROOM_IR_PANASONIC_AC;
+    _tvOnOff = false;
+    _tvVol = 10;
+    _tvChan = 1;
+    _acOnOff = false;
+    _acMode = AC_AC;
+    _acTemp = 24;
+    _acFanSpeed = 0;
+    _acFanDir = 0;
+    _resetCount = 0;
+    _lastReset = 1;
+
+    gpio_init(PUSHBUTTON_PIN);
+    gpio_set_dir(PUSHBUTTON_PIN, GPIO_IN);
+    gpio_pull_up(PUSHBUTTON_PIN);
+    gpio_set_irq_enabled_with_callback(PUSHBUTTON_PIN,
+                                       GPIO_IRQ_EDGE_RISE | GPIO_IRQ_EDGE_FALL,
+                                       true,
+                                       MeshRoom::gpio_callback);
+
+    gpio_init(OUTRESET_PIN);
+    gpio_set_dir(OUTRESET_PIN, GPIO_OUT);
+    gpio_put(OUTRESET_PIN, true);
+
+    gpio_init(IR_BLAST_PIN);
+    gpio_set_dir(IR_BLAST_PIN, GPIO_OUT);
+    gpio_put(IR_BLAST_PIN, false);
+
+    gpio_init(ALERT_LED_PIN);
+    gpio_set_dir(ALERT_LED_PIN, GPIO_OUT);
+    setAlertLed(false);
+
+    gpio_init(ONBOARD_LED_PIN);
+    gpio_set_dir(ONBOARD_LED_PIN, GPIO_OUT);
+    setOnboardLed(false);
+
+    adc_init();
+    adc_set_temp_sensor_enabled(true);
+    adc_select_input(4);
 }
 
 MeshRoom::~MeshRoom()
 {
 
+}
+
+
+void MeshRoom::gpio_callback(uint gpio, uint32_t events)
+{
+    static uint64_t t0 = 0;
+    struct button_event event = {
+        .ts = 0,
+        .tdur = 0,
+    };
+
+    if (gpio != PUSHBUTTON_PIN) {
+        goto done;
+    }
+
+    event.ts = time_us_64();
+
+    if (events & GPIO_IRQ_EDGE_FALL) {
+        t0 = event.ts;
+        goto done;
+    }
+
+    if (events & GPIO_IRQ_EDGE_RISE) {
+        if (t0 == 0) {
+            goto done;
+        }
+
+        event.tdur = event.ts - t0;
+        t0 = 0;
+
+        if (event.tdur < PUSHBUTTON_DURATION_THRESHOLD_US) {
+            goto done;
+        }
+    }
+
+    meshroom->_buttonEvents.push_back(event);
+
+done:
+
+    return;
+}
+
+bool MeshRoom::getButtonEvent(struct button_event &event, bool clearOld)
+{
+    bool result = false;
+
+    if (_buttonEvents.empty()) {
+        goto done;
+    }
+
+    if (clearOld) {
+        event = _buttonEvents.back();
+        _buttonEvents.clear();
+    } else {
+        event = _buttonEvents.front();
+    }
+
+done:
+
+    return result;
+}
+
+void MeshRoom::tvOnOff(bool onOff)
+{
+    _tvOnOff = onOff;
+}
+
+bool MeshRoom::tvOnOff(void) const
+{
+    return _tvOnOff;
+}
+
+void MeshRoom::tvVol(unsigned int volume)
+{
+    if (volume > 100) {
+        return;
+    }
+
+    _tvVol = volume;
+}
+
+unsigned int MeshRoom::tvVol(void) const
+{
+    return _tvVol;
+}
+
+void MeshRoom::tvChan(unsigned int chan)
+{
+    if (chan > 999) {
+        return;
+    }
+
+    _tvChan = chan;
+}
+
+unsigned int MeshRoom::tvChan(void) const
+{
+    return _tvChan;
+}
+
+void MeshRoom::acOnOff(bool onOff)
+{
+    _acOnOff = onOff;
+}
+
+bool MeshRoom::acOnOff(void) const
+{
+    return _acOnOff;
+}
+
+void MeshRoom::acMode(enum AcMode mode)
+{
+    if ((mode >= AC_AC) && (mode <= AC_AUTO)) {
+        _acMode = mode;
+    }
+}
+
+enum MeshRoom::AcMode MeshRoom::acMode(void) const
+{
+    return _acMode;
+}
+
+string MeshRoom::acModeStr(void) const
+{
+    string s;
+
+    switch (_acMode) {
+    case AC_AC:
+        s = "ac";
+        break;
+    case AC_HEATER:
+        s = "heater";
+        break;
+    case AC_DEHUMIDIFIER:
+        s = "dehumidifier";
+        break;
+    case AC_AUTO:
+        s = "auto";
+        break;
+    default:
+        break;
+    }
+
+    return s;
+}
+
+void MeshRoom::acTemp(unsigned int temp)
+{
+    if ((temp >= 20) && (temp <= 30)) {
+        _acTemp = temp;
+    }
+}
+
+unsigned int MeshRoom::acTemp(void) const
+{
+    return _acTemp;
+}
+
+void MeshRoom::acFanSpeed(unsigned int speed)
+{
+    if (speed <= 5) {
+        _acFanSpeed = speed;
+    }
+}
+
+unsigned int MeshRoom::acFanSpeed(void) const
+{
+    return _acFanSpeed;
+}
+
+void MeshRoom::acFanDir(unsigned int dir)
+{
+    if (dir <= 6) {
+        _acFanDir = dir;
+    }
+}
+
+unsigned int MeshRoom::acFanDir(void) const
+{
+    return _acFanDir;
+}
+
+void MeshRoom::reset(void)
+{
+    _resetCount++;
+    _lastReset = time(NULL);
+}
+
+unsigned int MeshRoom::getResetCount(void) const
+{
+    return _resetCount;
+}
+
+time_t MeshRoom::getLastReset(void) const
+{
+    return _lastReset;
+}
+
+void MeshRoom::buzz(unsigned int ms)
+{
+    (void)(ms);
+}
+
+void MeshRoom::buzzMorseCode(const string &text, bool clearPrevious)
+{
+    (void)(text);
+    (void)(clearPrevious);
+}
+
+bool MeshRoom::isAlertLedOn(void) const
+{
+    return _alertLed;
+}
+
+void MeshRoom::setAlertLed(bool onOff)
+{
+    _alertLed = onOff;
+    gpio_put(ALERT_LED_PIN, onOff);
+}
+
+void MeshRoom::flipAlertLed(void)
+{
+    _alertLed = !_alertLed;
+    gpio_put(ALERT_LED_PIN, _alertLed);
+}
+
+bool MeshRoom::isOnboardLedOn(void) const
+{
+    return _onboardLed;
+}
+
+void MeshRoom::setOnboardLed(bool onOff)
+{
+    _onboardLed = onOff;
+    gpio_put(ONBOARD_LED_PIN, onOff);
+}
+
+void MeshRoom::flipOnboardLed(void)
+{
+    _onboardLed = !_onboardLed;
+    gpio_put(ONBOARD_LED_PIN, _onboardLed);
+}
+
+float MeshRoom::getOnboardTempC(void) const
+{
+    static const float conversionFactor = 3.3f / (1 << 12);
+    float adc;
+    float temperature_c = 0.0;
+
+    adc = (float) adc_read() * conversionFactor;
+    temperature_c = 27.0f - (adc - 0.706f) / 0.001721f;
+
+    return temperature_c;
 }
 
 void MeshRoom::gotTextMessage(const meshtastic_MeshPacket &packet,
@@ -91,6 +388,84 @@ void MeshRoom::gotTraceRoute(const meshtastic_MeshPacket &packet,
         consoles_printf(" -> %s[%.2fdB]\n",
                         getDisplayName(packet.to).c_str(), rx_snr);
     }
+}
+
+string MeshRoom::handleUnknown(uint32_t node_num, string &message)
+{
+    string reply;
+    string first_word;
+
+    (void)(node_num);
+
+    first_word = message.substr(0, message.find(' '));
+    toLowercase(first_word);
+    message = message.substr(first_word.size());
+    trimWhitespace(message);
+
+    if (first_word == "tv") {
+        reply = handleTv(node_num, message);
+    } else if (first_word == "ac") {
+        reply = handleAc(node_num, message);
+    } else if (first_word == "reset") {
+        reply = handleReset(node_num, message);
+    }
+
+    return reply;
+}
+
+string MeshRoom::handleStatus(uint32_t node_num, string &message)
+{
+    string reply;
+
+    (void)(node_num);
+    (void)(message);
+
+    return reply;
+}
+
+string MeshRoom::handleEnv(uint32_t node_num, string &message)
+{
+    stringstream ss;
+
+    ss << HomeChat::handleEnv(node_num, message);
+    if (!ss.str().empty()) {
+        ss << endl;
+    }
+
+    ss << "board temperature: ";
+    ss <<  setprecision(3) << getOnboardTempC();
+
+    return ss.str();
+}
+
+string MeshRoom::handleTv(uint32_t node_num, string &message)
+{
+    string reply;
+
+    (void)(node_num);
+    (void)(message);
+
+    return reply;
+}
+
+string MeshRoom::handleAc(uint32_t node_num, string &message)
+{
+    string reply;
+
+    (void)(node_num);
+    (void)(message);
+
+    return reply;
+}
+
+string MeshRoom::handleReset(uint32_t node_num, string &message)
+{
+    string reply;
+
+    (void)(node_num);
+    (void)(message);
+
+    return reply;
 }
 
 int MeshRoom::vprintf(const char *format, va_list ap) const

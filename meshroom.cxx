@@ -45,7 +45,6 @@ static string copyright = string("Copyright (C) 2025, Charles Chiou");
 
 static void led_task(__unused void *params)
 {
-    bool led_on = false;
 
 #if defined(USE_WATCHDOG_TIMER)
     watchdog_enable(5000, true);
@@ -53,9 +52,8 @@ static void led_task(__unused void *params)
 #endif
 
     for (;;) {
-        led_set(led_on);
-        led_on = !led_on;
-        vTaskDelay(1000);
+        meshroom->flipOnboardLed();
+        vTaskDelay(pdMS_TO_TICKS(1000));
 
 #if defined(USE_WATCHDOG_TIMER)
         watchdog_update();
@@ -67,7 +65,7 @@ static void console_task(__unused void *params)
 {
     int ret;
 
-    vTaskDelay(1500);
+    vTaskDelay(pdMS_TO_TICKS(1500));
 
     console_printf("\n\x1b[2K");
     console_printf("%s\n", shell->banner().c_str());
@@ -82,7 +80,7 @@ static void console_task(__unused void *params)
             ret = shell->process();
         } while (ret > 0);
 
-        vTaskDelay(50);
+        vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
 
@@ -103,27 +101,29 @@ static void console2_task(__unused void *params)
             ret = shell2->process();
         } while (ret > 0);
 
-        vTaskDelay(50);
+        vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
 
 static void meshtastic_task(__unused void *params)
 {
     int ret = 0;
-    uint64_t now, last_want_config, last_heartbeat;
+    time_t now, last_want_config, last_heartbeat;
     extern SemaphoreHandle_t uart1_sem;
 
-    now = time_us_64();
+    if (meshroom->loadNvm() == false) {
+        meshroom->saveNvm();
+    }
+    meshroom->applyNvmToHomeChat();
+
+    now = time(NULL);
     last_heartbeat = now;
     last_want_config = 0;
 
-    vTaskDelay(5000);
-
     for (;;) {
-        now = time_us_64();
+        now = time(NULL);
 
-        if (!meshroom->isConnected() &&
-            ((now - last_want_config) >= 5000000)) {
+        if (!meshroom->isConnected() && ((now - last_want_config) >= 5)) {
             ret = meshroom->sendWantConfig();
             if (ret == false) {
                 console_printf("sendWantConfig failed!\n");
@@ -135,7 +135,7 @@ static void meshtastic_task(__unused void *params)
         }
 
         if (meshroom->isConnected() &&
-            ((now - last_heartbeat) >= 60000000)) {
+            ((now - last_heartbeat) >= 60)) {
             ret = meshroom->sendHeartbeat();
             if (ret == false) {
                 console_printf("sendHeartbeat failed!\n");
@@ -156,7 +156,7 @@ static void meshtastic_task(__unused void *params)
             }
         }
 
-        xSemaphoreTake(uart1_sem, 1000);
+        xSemaphoreTake(uart1_sem, pdMS_TO_TICKS(1000));
     }
 }
 
@@ -167,18 +167,14 @@ int main(void)
     TaskHandle_t console2Task;
     TaskHandle_t meshtasticTask;
 
+    stdio_usb_init();
     stdio_init_all();
     serial_init();
-    led_init();
 
     meshroom = make_shared<MeshRoom>();
     meshroom->setClient(meshroom);
     meshroom->setNvm(meshroom);
     meshroom->sendDisconnect();
-    if (meshroom->loadNvm() == false) {
-        meshroom->saveNvm();  // Create a default
-    }
-    meshroom->applyNvmToHomeChat();
 
     shell = make_shared<MeshRoomShell>();
     shell->setBanner(banner);
