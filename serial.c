@@ -33,8 +33,6 @@
 
 #define SERIAL_BUF_BUF_SIZE  256
 
-unsigned int serial_rx_overflow = 0;
-
 struct serial_buf {
     unsigned int rp;
     unsigned int wp;
@@ -59,11 +57,10 @@ static struct serial_buf uart1_buf = {
 
 SemaphoreHandle_t uart1_sem = NULL;
 
-static void serial_interrupt_handler(void)
+static void serial0_interrupt_handler(void)
 {
-    unsigned int rp, wp;
+    unsigned int wp;
     char *dst;
-    bool uart1_event = false;
 
     dst = uart0_buf.buf;
     wp = uart0_buf.wp;
@@ -73,25 +70,23 @@ static void serial_interrupt_handler(void)
     }
     uart0_buf.wp = wp;
 
+}
+static void serial1_interrupt_handler(void)
+{
+    unsigned int wp;
+    char *dst;
+
     dst = uart1_buf.buf;
-    rp = uart1_buf.wp;
     wp = uart1_buf.wp;
     while (uart_is_readable(uart1)) {
         dst[wp] = (char) uart_get_hw(uart1)->dr;
         wp = ((wp + 1) % SERIAL_BUF_BUF_SIZE);
-        uart1_event = true;
-        if (wp == rp) {
-            serial_rx_overflow++;
-            break;
-        }
     }
     uart1_buf.wp = wp;
 
-    if (uart1_event) {
-        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-        xSemaphoreGiveFromISR(uart1_sem, &xHigherPriorityTaskWoken);
-        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-    }
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    xSemaphoreGiveFromISR(uart1_sem, &xHigherPriorityTaskWoken);
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
 void serial_init(void)
@@ -102,7 +97,7 @@ void serial_init(void)
     uart_set_hw_flow(uart0, false, false);
     uart_set_fifo_enabled(uart0, true);
     uart_set_format(uart0, UART_DATA_BITS, UART_STOP_BITS, UART_PARITY);
-    irq_set_exclusive_handler(UART0_IRQ, serial_interrupt_handler);
+    irq_set_exclusive_handler(UART0_IRQ, serial0_interrupt_handler);
     irq_set_enabled(UART0_IRQ, true);
     uart_set_irq_enables(uart0, true, false);
 
@@ -112,7 +107,7 @@ void serial_init(void)
     uart_set_hw_flow(uart1, false, false);
     uart_set_fifo_enabled(uart1, true);
     uart_set_format(uart1, UART_DATA_BITS, UART_STOP_BITS, UART_PARITY);
-    irq_set_exclusive_handler(UART1_IRQ, serial_interrupt_handler);
+    irq_set_exclusive_handler(UART1_IRQ, serial1_interrupt_handler);
     irq_set_enabled(UART1_IRQ, true);
     uart_set_irq_enables(uart1, true, false);
     uart1_sem = xSemaphoreCreateBinary();

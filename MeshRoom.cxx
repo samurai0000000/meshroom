@@ -36,8 +36,8 @@ MeshRoom::MeshRoom()
     _acTemp = 24;
     _acFanSpeed = 0;
     _acFanDir = 0;
-    _resetCount = 0;
-    _lastReset = 1;
+    _resetCount = 1;
+    _lastReset = time(NULL);
 
     gpio_init(PUSHBUTTON_PIN);
     gpio_set_dir(PUSHBUTTON_PIN, GPIO_IN);
@@ -49,7 +49,13 @@ MeshRoom::MeshRoom()
 
     gpio_init(OUTRESET_PIN);
     gpio_set_dir(OUTRESET_PIN, GPIO_OUT);
+    gpio_put(OUTRESET_PIN, false);
+    for (volatile uint32_t counter = 0; counter < 0xffff; counter++);
     gpio_put(OUTRESET_PIN, true);
+
+    gpio_init(BUZZER_PIN);
+    gpio_set_dir(BUZZER_PIN, GPIO_OUT);
+    gpio_put(BUZZER_PIN, false);
 
     gpio_init(IR_BLAST_PIN);
     gpio_set_dir(IR_BLAST_PIN, GPIO_OUT);
@@ -256,6 +262,11 @@ unsigned int MeshRoom::acFanDir(void) const
 void MeshRoom::reset(void)
 {
     _resetCount++;
+
+    gpio_put(OUTRESET_PIN, false);
+    vTaskDelay(pdMS_TO_TICKS(500));
+    gpio_put(OUTRESET_PIN, true);
+
     _lastReset = time(NULL);
 }
 
@@ -269,9 +280,20 @@ time_t MeshRoom::getLastReset(void) const
     return _lastReset;
 }
 
+unsigned int MeshRoom::getLastResetSecsAgo(void) const
+{
+    time_t now;
+
+    now = time(NULL);
+
+    return now - _lastReset;
+}
+
 void MeshRoom::buzz(unsigned int ms)
 {
-    (void)(ms);
+    gpio_put(BUZZER_PIN, true);
+    vTaskDelay(pdMS_TO_TICKS(ms));
+    gpio_put(BUZZER_PIN, false);
 }
 
 void MeshRoom::buzzMorseCode(const string &text, bool clearPrevious)

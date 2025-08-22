@@ -36,13 +36,15 @@ MeshRoomShell::~MeshRoomShell()
 
 int MeshRoomShell::tx_write(const uint8_t *buf, size_t size)
 {
-    int ret;
+    int ret = 0;
     int console_id = (int) _ctx;
 
-    if (console_id == 0) {
+    if (console_id == 1) {
         ret = console_write(buf, size);
-    } else {
+    } else if (console_id == 2) {
         ret = console2_write(buf, size);
+    } else {
+        ret = -1;
     }
 
     return ret;
@@ -55,10 +57,12 @@ int MeshRoomShell::printf(const char *format, ...)
     int console_id = (int) _ctx;
 
     va_start(ap, format);
-    if (console_id == 0) {
+    if (console_id == 1) {
         ret = console_vprintf(format, ap);
-    } else {
+    } else if (console_id == 2) {
         ret = console2_vprintf(format, ap);
+    } else {
+        ret = -1;
     }
     va_end(ap);
 
@@ -67,13 +71,15 @@ int MeshRoomShell::printf(const char *format, ...)
 
 int MeshRoomShell::rx_ready(void) const
 {
-    int ret;
+    int ret = 0;
     int console_id = (int) _ctx;
 
-    if (console_id == 0) {
+    if (console_id == 1) {
         ret = console_rx_ready();
-    } else {
+    } else if (console_id == 2) {
         ret = console2_rx_ready();
+    } else {
+        ret = -1;
     }
 
     return ret;
@@ -81,13 +87,15 @@ int MeshRoomShell::rx_ready(void) const
 
 int MeshRoomShell::rx_read(uint8_t *buf, size_t size)
 {
-    int ret;
+    int ret = 0;
     int console_id = (int) _ctx;
 
-    if (console_id == 0) {
+    if (console_id == 1) {
         ret = console_read(buf, size);
-    } else {
+    } else if (console_id == 2) {
         ret = console2_read(buf, size);
+    } else {
+        ret = -1;
     }
 
     return ret;
@@ -379,6 +387,26 @@ done:
     return ret;
 }
 
+int MeshRoomShell::buzz(int argc, char **argv)
+{
+    if (argc == 1) {
+        meshroom->buzz();
+    } else if ((argc == 2)) {
+        unsigned int ms;
+
+        try {
+            ms = stoul(argv[1]);
+            meshroom->buzz(ms);
+        } catch (const invalid_argument &e) {
+            this->printf("syntax error!\n");
+        }
+    } else {
+        this->printf("syntax error!\n");
+    }
+
+    return -1;
+}
+
 int MeshRoomShell::reset(int argc, char **argv)
 {
     int ret = 0;
@@ -417,6 +445,8 @@ int MeshRoomShell::unknown_command(int argc, char **argv)
         ret = this->tv(argc, argv);
     } else if (strcmp(argv[0], "ac") == 0) {
         ret = this->ac(argc, argv);
+    } else if (strcmp(argv[0], "buzz") == 0) {
+        ret = this->buzz(argc, argv);
     } else if (strcmp(argv[0], "reset") == 0) {
         ret = this->reset(argc, argv);
     } else {

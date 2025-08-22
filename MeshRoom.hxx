@@ -14,7 +14,7 @@
 
 #define PUSHBUTTON_PIN   13
 #define OUTRESET_PIN     14
-#define BUZZER_PIN       15
+#define BUZZER_PIN       22
 #define IR_BLAST_PIN     17
 #define ALERT_LED_PIN    21
 #define ONBOARD_LED_PIN  25
@@ -93,6 +93,7 @@ public:
     void reset(void);
     unsigned int getResetCount(void) const;
     time_t getLastReset(void) const;
+    unsigned int getLastResetSecsAgo(void) const;
 
     void buzz(unsigned int ms = 500);
     void buzzMorseCode(const string &text, bool clearPrevious = false);

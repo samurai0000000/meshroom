@@ -123,6 +123,13 @@ static void meshtastic_task(__unused void *params)
     for (;;) {
         now = time(NULL);
 
+        if (meshroom->isConnected() &&
+            (meshroom->meshDeviceLastRecivedSecondsAgo() > 120) &&
+            (meshroom->getLastResetSecsAgo() > 120)) {
+            console_printf("detected meshtastic stuck!\n");
+            meshroom->reset();
+        }
+
         if (!meshroom->isConnected() && ((now - last_want_config) >= 5)) {
             ret = meshroom->sendWantConfig();
             if (ret == false) {
@@ -167,7 +174,6 @@ int main(void)
     TaskHandle_t console2Task;
     TaskHandle_t meshtasticTask;
 
-    stdio_usb_init();
     stdio_init_all();
     serial_init();
 
@@ -183,7 +189,7 @@ int main(void)
     shell->setCopyright(copyright);
     shell->setClient(meshroom);
     shell->setNvm(meshroom);
-    shell->attach((void *) 0);
+    shell->attach((void *) 1);
 
     shell2 = make_shared<MeshRoomShell>();
     shell2->setBanner(banner);
@@ -192,7 +198,7 @@ int main(void)
     shell2->setCopyright(copyright);
     shell2->setClient(meshroom);
     shell2->setNvm(meshroom);
-    shell2->attach((void *) 1);
+    shell2->attach((void *) 2);
 
     xTaskCreate(led_task,
                 "LedTask",
@@ -224,7 +230,7 @@ int main(void)
 
 #if defined(configUSE_CORE_AFFINITY) && (configNUMBER_OF_CORES > 1)
     vTaskCoreAffinitySet(ledTask, 0x2);
-    vTaskCoreAffinitySet(consoleTask, 0x2);
+    vTaskCoreAffinitySet(consoleTask, 0x1);
     vTaskCoreAffinitySet(console2Task, 0x2);
     vTaskCoreAffinitySet(meshtasticTask, 0x1);
 #endif
