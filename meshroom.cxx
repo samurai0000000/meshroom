@@ -11,6 +11,8 @@
 #include <hardware/uart.h>
 #include <hardware/sync.h>
 #include <hardware/watchdog.h>
+#include <hardware/clocks.h>
+#include <hardware/pll.h>
 #include <FreeRTOS.h>
 #include <task.h>
 #include <semphr.h>
@@ -23,14 +25,16 @@
 
 #define USE_WATCHDOG_TIMER
 
-#define LED_TASK_STACK_SIZE            configMINIMAL_STACK_SIZE
-#define LED_TASK_PRIORITY              (tskIDLE_PRIORITY + 1UL)
+#define LED_TASK_STACK_SIZE            (1 * 1024)
+#define LED_TASK_PRIORITY              (tskIDLE_PRIORITY + 3UL)
 #define CONSOLE_TASK_STACK_SIZE        (4 * 1024)
-#define CONSOLE_TASK_PRIORITY          (tskIDLE_PRIORITY + 2UL)
+#define CONSOLE_TASK_PRIORITY          (tskIDLE_PRIORITY + 4UL)
 #define CONSOLE2_TASK_STACK_SIZE       (4 * 1024)
-#define CONSOLE2_TASK_PRIORITY         (tskIDLE_PRIORITY + 3UL)
-#define MESHTASTIC_TASK_STACK_SIZE     (16 * 1024)
-#define MESHTASTIC_TASK_PRIORITY       (tskIDLE_PRIORITY + 4UL)
+#define CONSOLE2_TASK_PRIORITY         (tskIDLE_PRIORITY + 5UL)
+#define MESHTASTIC_TASK_STACK_SIZE     (12 * 1024)
+#define MESHTASTIC_TASK_PRIORITY       (tskIDLE_PRIORITY + 2UL)
+#define MORSEBUZZER_TASK_STACK_SIZE    (2 * 1024)
+#define MORSEBUZZER_TASK_PRIORITY      (tskIDLE_PRIORITY + 1UL)
 
 shared_ptr<MeshRoom> meshroom = NULL;
 static shared_ptr<MeshRoomShell> shell = NULL;
@@ -45,7 +49,6 @@ static string copyright = string("Copyright (C) 2025, Charles Chiou");
 
 static void led_task(__unused void *params)
 {
-
 #if defined(USE_WATCHDOG_TIMER)
     watchdog_enable(5000, true);
     watchdog_enable_caused_reboot();
@@ -91,6 +94,8 @@ static void console2_task(__unused void *params)
     console2_printf("\n\x1b[2K");
     console2_printf("%s\n", shell2->banner().c_str());
     console2_printf("%s\n", shell2->version().c_str());
+    console2_printf("Pico SDK version: " PICO_SDK_VERSION_STRING "\n");
+    console2_printf("FreeRTOS version: " tskKERNEL_VERSION_NUMBER "\n");
     console2_printf("%s\n", shell2->built().c_str());
     console2_printf("-------------------------------------------\n");
     console2_printf("%s\n", shell2->copyright().c_str());
@@ -167,14 +172,35 @@ static void meshtastic_task(__unused void *params)
     }
 }
 
+static void morsebuzzer_task(__unused void *params)
+{
+    for (;;) {
+        meshroom->runMorseThread();
+    }
+}
+
 int main(void)
 {
     TaskHandle_t ledTask;
     TaskHandle_t consoleTask;
     TaskHandle_t console2Task;
     TaskHandle_t meshtasticTask;
+    TaskHandle_t morsebuzzerTask;
 
     stdio_init_all();
+
+#if 0
+    clock_configure(clk_sys,
+                    CLOCKS_CLK_SYS_CTRL_SRC_VALUE_CLKSRC_CLK_SYS_AUX,
+                    CLOCKS_CLK_SYS_CTRL_AUXSRC_VALUE_CLKSRC_PLL_USB,
+                    48 * MHZ, 48 * MHZ);
+    pll_deinit(pll_sys);
+    clock_configure(clk_peri,
+                    0,
+                    CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLK_SYS,
+                    48 * MHZ, 48 * MHZ);
+#endif
+
     serial_init();
 
     meshroom = make_shared<MeshRoom>();
@@ -228,11 +254,19 @@ int main(void)
                 MESHTASTIC_TASK_PRIORITY,
                 &meshtasticTask);
 
+    xTaskCreate(morsebuzzer_task,
+                "MeshtasticThread",
+                MORSEBUZZER_TASK_STACK_SIZE,
+                NULL,
+                MORSEBUZZER_TASK_PRIORITY,
+                &morsebuzzerTask);
+
 #if defined(configUSE_CORE_AFFINITY) && (configNUMBER_OF_CORES > 1)
     vTaskCoreAffinitySet(ledTask, 0x2);
     vTaskCoreAffinitySet(consoleTask, 0x1);
     vTaskCoreAffinitySet(console2Task, 0x2);
     vTaskCoreAffinitySet(meshtasticTask, 0x1);
+    vTaskCoreAffinitySet(morsebuzzerTask, 0x2);
 #endif
 
     vTaskStartScheduler();

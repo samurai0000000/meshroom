@@ -67,9 +67,9 @@ target_compile_definitions(meshroom PRIVATE PICO_STACK_SIZE=${PICO_STACK_SIZE})
 target_include_directories(meshroom PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(meshroom
   libmeshtastic
-  FreeRTOS-Kernel-Heap4
   pico_stdlib
   pico_multicore
   hardware_adc
+  FreeRTOS-Kernel-Heap4
   )
 pico_add_extra_outputs(meshroom)

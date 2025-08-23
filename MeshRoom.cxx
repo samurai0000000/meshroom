@@ -298,8 +298,11 @@ void MeshRoom::buzz(unsigned int ms)
 
 void MeshRoom::buzzMorseCode(const string &text, bool clearPrevious)
 {
-    (void)(text);
-    (void)(clearPrevious);
+    if (clearPrevious) {
+        this->clearMorseText();
+    }
+
+    this->addMorseText(text);
 }
 
 bool MeshRoom::isAlertLedOn(void) const
@@ -430,6 +433,10 @@ string MeshRoom::handleUnknown(uint32_t node_num, string &message)
         reply = handleAc(node_num, message);
     } else if (first_word == "reset") {
         reply = handleReset(node_num, message);
+    } else if (first_word == "buzz") {
+        reply = handleBuzz(node_num, message);
+    } else if (first_word == "morse") {
+        reply = handleMorse(node_num, message);
     }
 
     return reply;
@@ -441,6 +448,8 @@ string MeshRoom::handleStatus(uint32_t node_num, string &message)
 
     (void)(node_num);
     (void)(message);
+
+    reply = "operational";
 
     return reply;
 }
@@ -486,6 +495,31 @@ string MeshRoom::handleReset(uint32_t node_num, string &message)
 
     (void)(node_num);
     (void)(message);
+
+    return reply;
+}
+
+string MeshRoom::handleBuzz(uint32_t node_num, string &message)
+{
+    string reply;
+
+    (void)(node_num);
+    (void)(message);
+
+    buzz();
+
+    return reply;
+}
+
+string MeshRoom::handleMorse(uint32_t node_num, string &message)
+{
+    string reply;
+
+    (void)(node_num);
+    (void)(message);
+
+    addMorseText(message);
+    reply = "buzzing morse code: '" + message + "'";
 
     return reply;
 }
@@ -692,6 +726,20 @@ bool MeshRoom::applyNvmToHomeChat(void)
     }
 
     return result;
+}
+
+void MeshRoom::sleepForMs(unsigned int ms)
+{
+    vTaskDelay(pdMS_TO_TICKS(ms));
+}
+
+void MeshRoom::toggleBuzzer(bool onOff)
+{
+    if (onOff) {
+        gpio_put(BUZZER_PIN, true);
+    } else {
+        gpio_put(BUZZER_PIN, false);
+    }
 }
 
 /*

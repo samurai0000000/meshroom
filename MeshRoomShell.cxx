@@ -103,16 +103,16 @@ int MeshRoomShell::rx_read(uint8_t *buf, size_t size)
 
 int MeshRoomShell::system(int argc, char **argv)
 {
-    extern char __StackTop, __StackBottom;
+    //extern char __StackTop, __StackBottom;
     extern char __StackLimit, __bss_end__;
     struct mallinfo m = mallinfo();
-    unsigned int stack_size = &__StackTop - &__StackBottom;
+    //unsigned int stack_size = &__StackTop - &__StackBottom;
     unsigned int total_heap = &__StackLimit  - &__bss_end__;
     unsigned int used_heap = m.uordblks;
     unsigned int free_heap = total_heap - used_heap;
 
     SimpleShell::system(argc, argv);
-    this->printf("Stack Size: %8u bytes\n", stack_size);
+    //this->printf("Stack Size: %8u bytes\n", stack_size);
     this->printf("Total Heap: %8u bytes\n", total_heap);
     this->printf(" Free Heap: %8u bytes\n", free_heap);
     this->printf(" Used Heap: %8u bytes\n", used_heap);
@@ -407,6 +407,19 @@ int MeshRoomShell::buzz(int argc, char **argv)
     return -1;
 }
 
+int MeshRoomShell::morse(int argc, char **argv)
+{
+    string text;
+
+    for (int i = 1; i < argc; i++) {
+        text += argv[i];
+    }
+
+    meshroom->addMorseText(text);
+
+    return 0;
+}
+
 int MeshRoomShell::reset(int argc, char **argv)
 {
     int ret = 0;
@@ -447,6 +460,8 @@ int MeshRoomShell::unknown_command(int argc, char **argv)
         ret = this->ac(argc, argv);
     } else if (strcmp(argv[0], "buzz") == 0) {
         ret = this->buzz(argc, argv);
+    } else if (strcmp(argv[0], "morse") == 0) {
+        ret = this->morse(argc, argv);
     } else if (strcmp(argv[0], "reset") == 0) {
         ret = this->reset(argc, argv);
     } else {

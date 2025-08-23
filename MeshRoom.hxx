@@ -11,6 +11,7 @@
 #include <SimpleClient.hxx>
 #include <HomeChat.hxx>
 #include <BaseNvm.hxx>
+#include <MorseBuzzer.hxx>
 
 #define PUSHBUTTON_PIN   13
 #define OUTRESET_PIN     14
@@ -55,6 +56,7 @@ struct button_event {
  * Suitable for use on resource-constraint MCU platforms.
  */
 class MeshRoom : public SimpleClient, public HomeChat, public BaseNvm,
+                 public MorseBuzzer,
                  public enable_shared_from_this<MeshRoom> {
 
 public:
@@ -131,9 +133,13 @@ protected:
     virtual string handleTv(uint32_t node_num, string &message);
     virtual string handleAc(uint32_t node_num, string &message);
     virtual string handleReset(uint32_t node_num, string &message);
+    virtual string handleBuzz(uint32_t node_num, string &message);
+    virtual string handleMorse(uint32_t node_num, string &message);
     virtual int vprintf(const char *format, va_list ap) const;
 
 public:
+
+    // Extend BaseNVM
 
     inline uint32_t ir_flags(void) const {
         return _main_body.ir_flags;
@@ -146,6 +152,13 @@ public:
     virtual bool loadNvm(void);
     virtual bool saveNvm(void);
     bool applyNvmToHomeChat(void);
+
+protected:
+
+    // Extend MorseBuzzer
+
+    virtual void sleepForMs(unsigned int ms);
+    virtual void toggleBuzzer(bool onOff);
 
 private:
 
