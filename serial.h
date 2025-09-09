@@ -10,7 +10,9 @@
 EXTERN_C_BEGIN
 
 extern void serial_init(void);
+extern void serial_deinit(void);
 
+#if defined(LIB_PICO_STDIO_USB)
 extern int console_write(const uint8_t *data, size_t size);
 extern int console_printf(const char *format, ...);
 extern int console_vprintf(const char *format, va_list ap);
@@ -18,6 +20,7 @@ extern int console_rx_ready(void);
 extern int console_read(uint8_t *data, size_t size);
 extern int console_read_timeout_us(uint8_t *data, size_t size,
 				   unsigned int timeout_us);
+#endif
 
 extern int console2_write(const uint8_t *data, size_t size);
 extern int console2_printf(const char *format, ...);
@@ -32,7 +35,11 @@ extern int serial_write(const void *buf, size_t len);
 extern int serial_rx_ready(void);
 extern int serial_read(void *buf, size_t len);
 
-extern unsigned int serial_rx_overflow;
+#if defined(SEMAPHORE_H)
+extern SemaphoreHandle_t cdc_sem;
+extern SemaphoreHandle_t uart0_sem;
+extern SemaphoreHandle_t uart1_sem;
+#endif
 
 EXTERN_C_END
 

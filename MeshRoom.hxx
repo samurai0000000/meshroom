@@ -7,6 +7,8 @@
 #ifndef MESHROOM_HXX
 #define MESHROOM_HXX
 
+#include <FreeRTOS.h>
+#include <semphr.h>
 #include <vector>
 #include <SimpleClient.hxx>
 #include <HomeChat.hxx>
@@ -177,7 +179,6 @@ private:
     unsigned int _acFanDir;
     unsigned int _resetCount;
     time_t _lastReset;
-    vector<string> _morseText;
     bool _alertLed;
     bool _onboardLed;
 

@@ -9,6 +9,7 @@
 #include <pico/time.h>
 #include <hardware/sync.h>
 #include <hardware/watchdog.h>
+#include <hardware/clocks.h>
 #include <pico/bootrom.h>
 #include <FreeRTOS.h>
 #include <task.h>
@@ -26,6 +27,8 @@ MeshRoomShell::MeshRoomShell(shared_ptr<SimpleClient> client)
     _help_list.push_back("bootsel");
     _help_list.push_back("tv");
     _help_list.push_back("ac");
+    _help_list.push_back("buzz");
+    _help_list.push_back("morse");
     _help_list.push_back("reset");
 }
 
@@ -40,7 +43,9 @@ int MeshRoomShell::tx_write(const uint8_t *buf, size_t size)
     int console_id = (int) _ctx;
 
     if (console_id == 1) {
+#if defined(LIB_PICO_STDIO_USB)
         ret = console_write(buf, size);
+#endif
     } else if (console_id == 2) {
         ret = console2_write(buf, size);
     } else {
@@ -58,7 +63,9 @@ int MeshRoomShell::printf(const char *format, ...)
 
     va_start(ap, format);
     if (console_id == 1) {
+#if defined(LIB_PICO_STDIO_USB)
         ret = console_vprintf(format, ap);
+#endif
     } else if (console_id == 2) {
         ret = console2_vprintf(format, ap);
     } else {
@@ -75,7 +82,9 @@ int MeshRoomShell::rx_ready(void) const
     int console_id = (int) _ctx;
 
     if (console_id == 1) {
+#if defined(LIB_PICO_STDIO_USB)
         ret = console_rx_ready();
+#endif
     } else if (console_id == 2) {
         ret = console2_rx_ready();
     } else {
@@ -91,7 +100,9 @@ int MeshRoomShell::rx_read(uint8_t *buf, size_t size)
     int console_id = (int) _ctx;
 
     if (console_id == 1) {
+#if defined(LIB_PICO_STDIO_USB)
         ret = console_read(buf, size);
+#endif
     } else if (console_id == 2) {
         ret = console2_read(buf, size);
     } else {
@@ -103,20 +114,24 @@ int MeshRoomShell::rx_read(uint8_t *buf, size_t size)
 
 int MeshRoomShell::system(int argc, char **argv)
 {
-    //extern char __StackTop, __StackBottom;
     extern char __StackLimit, __bss_end__;
     struct mallinfo m = mallinfo();
-    //unsigned int stack_size = &__StackTop - &__StackBottom;
     unsigned int total_heap = &__StackLimit  - &__bss_end__;
     unsigned int used_heap = m.uordblks;
     unsigned int free_heap = total_heap - used_heap;
 
     SimpleShell::system(argc, argv);
-    //this->printf("Stack Size: %8u bytes\n", stack_size);
     this->printf("Total Heap: %8u bytes\n", total_heap);
     this->printf(" Free Heap: %8u bytes\n", free_heap);
     this->printf(" Used Heap: %8u bytes\n", used_heap);
     this->printf("Board Temp:     %.1fC\n", meshroom->getOnboardTempC());
+    if ((argc == 2) && (strcmp(argv[1], "-v") == 0)) {
+        this->printf("clk_ref:  %lu Hz\n", clock_get_hz(clk_ref));
+        this->printf("clk_sys:  %lu Hz\n", clock_get_hz(clk_sys));
+        this->printf("clk_usb:  %lu Hz\n", clock_get_hz(clk_usb));
+        this->printf("clk_adc:  %lu Hz\n", clock_get_hz(clk_adc));
+        this->printf("clk_peri: %lu Hz\n", clock_get_hz(clk_peri));
+    }
 
     return 0;
 }

@@ -31,6 +31,8 @@
 #define UART_STOP_BITS    1
 #define UART_PARITY       UART_PARITY_NONE
 
+#define SERIAL_PBUF_SIZE  256
+
 #define SERIAL_BUF_BUF_SIZE  256
 
 struct serial_buf {
@@ -38,10 +40,6 @@ struct serial_buf {
     unsigned int wp;
     char buf[SERIAL_BUF_BUF_SIZE];
 };
-
-
-#define SERIAL_PBUF_SIZE  256
-static char pbuf[SERIAL_PBUF_SIZE];
 
 static struct serial_buf uart0_buf = {
     .rp = 0,
@@ -55,12 +53,17 @@ static struct serial_buf uart1_buf = {
     .buf = { 0, },
 };
 
+SemaphoreHandle_t uart0_sem = NULL;
 SemaphoreHandle_t uart1_sem = NULL;
 
 static void serial0_interrupt_handler(void)
 {
     unsigned int wp;
     char *dst;
+    UBaseType_t uxSavedInterruptStatus;
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+    uxSavedInterruptStatus = taskENTER_CRITICAL_FROM_ISR();
 
     dst = uart0_buf.buf;
     wp = uart0_buf.wp;
@@ -70,11 +73,19 @@ static void serial0_interrupt_handler(void)
     }
     uart0_buf.wp = wp;
 
+    taskEXIT_CRITICAL_FROM_ISR(uxSavedInterruptStatus);
+
+    xSemaphoreGiveFromISR(uart0_sem, &xHigherPriorityTaskWoken);
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 static void serial1_interrupt_handler(void)
 {
     unsigned int wp;
     char *dst;
+    UBaseType_t uxSavedInterruptStatus;
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+    uxSavedInterruptStatus = taskENTER_CRITICAL_FROM_ISR();
 
     dst = uart1_buf.buf;
     wp = uart1_buf.wp;
@@ -84,13 +95,19 @@ static void serial1_interrupt_handler(void)
     }
     uart1_buf.wp = wp;
 
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    taskEXIT_CRITICAL_FROM_ISR(uxSavedInterruptStatus);
+
     xSemaphoreGiveFromISR(uart1_sem, &xHigherPriorityTaskWoken);
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
 void serial_init(void)
 {
+    uart0_sem = xSemaphoreCreateBinary();
+    assert(uart0_sem != NULL);
+    uart1_sem = xSemaphoreCreateBinary();
+    assert(uart1_sem != NULL);
+
     uart_init(uart0, UART0_BAUD_RATE);
     gpio_set_function(UART0_TX_PIN, GPIO_FUNC_UART);
     gpio_set_function(UART0_RX_PIN, GPIO_FUNC_UART);
@@ -110,7 +127,12 @@ void serial_init(void)
     irq_set_exclusive_handler(UART1_IRQ, serial1_interrupt_handler);
     irq_set_enabled(UART1_IRQ, true);
     uart_set_irq_enables(uart1, true, false);
-    uart1_sem = xSemaphoreCreateBinary();
+}
+
+void serial_deinit(void)
+{
+    vSemaphoreDelete(uart0_sem);
+    vSemaphoreDelete(uart1_sem);
 }
 
 static int __serial_write(uart_inst_t *uart, const void *_buf, size_t len)
@@ -200,14 +222,20 @@ done:
     return ret;
 }
 
+#if defined(LIB_PICO_STDIO_USB)
+
 int console_write(const uint8_t *data, size_t size)
 {
-    return stdio_put_string((const char *) data, (int) size, false, false);
+    int ret = 0;
+
+    ret = stdio_put_string((const char *) data, (int) size, false, false);
+
+    return ret;
 }
 
 int console_printf(const char *format, ...)
 {
-    int ret;
+    int ret = 0;
     va_list ap;
 
     va_start(ap, format);
@@ -219,7 +247,11 @@ int console_printf(const char *format, ...)
 
 int console_vprintf(const char *format, va_list ap)
 {
-    return stdio_vprintf(format, ap);
+    int ret = 0;
+
+    ret = stdio_vprintf(format, ap);
+
+    return ret;
 }
 
 int console_rx_ready(void)
@@ -252,6 +284,8 @@ int console_read_timeout_us(uint8_t *data, size_t size,
     return ret;
 }
 
+#endif //  LIB_PICO_STDIO_USB
+
 int console2_write(const uint8_t *data, size_t size)
 {
     return __serial_write(uart0, data, size);
@@ -271,7 +305,12 @@ int console2_printf(const char *format, ...)
 
 int console2_vprintf(const char *format, va_list ap)
 {
-    int ret;
+    int ret = 0;
+    char *pbuf = (char *) malloc(SERIAL_PBUF_SIZE);
+
+    if (pbuf == NULL) {
+        goto done;
+    }
 
     ret = vsnprintf(pbuf, SERIAL_PBUF_SIZE - 1, format, ap);
 
@@ -281,6 +320,12 @@ int console2_vprintf(const char *format, va_list ap)
         }
 
         while (__serial_write(uart0, pbuf + i, 1) != 1);
+    }
+
+done:
+
+    if (pbuf) {
+        free(pbuf);
     }
 
     return ret;
@@ -302,8 +347,10 @@ int consoles_printf(const char *format, ...)
     va_list ap;
 
     va_start(ap, format);
+#if defined(LIB_PICO_STDIO_USB)
     ret = console_vprintf(format, ap);
-    (void) console2_vprintf(format, ap);
+#endif
+    ret = console2_vprintf(format, ap);
     va_end(ap);
 
     return ret;
@@ -313,8 +360,10 @@ int consoles_vprintf(const char *format, va_list ap)
 {
     int ret = 0;
 
+#if defined(LIB_PICO_STDIO_USB)
     ret = console_vprintf(format, ap);
-    (void) console2_vprintf(format, ap);
+#endif
+    ret = console2_vprintf(format, ap);
 
     return ret;
 }

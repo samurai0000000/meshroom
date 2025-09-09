@@ -22,7 +22,7 @@
 extern shared_ptr<MeshRoom> meshroom;
 
 MeshRoom::MeshRoom()
-    : SimpleClient(), HomeChat(), BaseNvm()
+    : SimpleClient(), HomeChat(), BaseNvm(), MorseBuzzer()
 {
     bzero(&_main_body, sizeof(_main_body));
     _main_body.ir_flags =
@@ -72,13 +72,13 @@ MeshRoom::MeshRoom()
     adc_init();
     adc_set_temp_sensor_enabled(true);
     adc_select_input(4);
+
 }
 
 MeshRoom::~MeshRoom()
 {
 
 }
-
 
 void MeshRoom::gpio_callback(uint gpio, uint32_t events)
 {
@@ -87,6 +87,9 @@ void MeshRoom::gpio_callback(uint gpio, uint32_t events)
         .ts = 0,
         .tdur = 0,
     };
+    UBaseType_t uxSavedInterruptStatus;
+
+    uxSavedInterruptStatus = taskENTER_CRITICAL_FROM_ISR();
 
     if (gpio != PUSHBUTTON_PIN) {
         goto done;
@@ -112,9 +115,14 @@ void MeshRoom::gpio_callback(uint gpio, uint32_t events)
         }
     }
 
-    meshroom->_buttonEvents.push_back(event);
+
+    if (meshroom->_buttonEvents.size() < 5) {
+        meshroom->_buttonEvents.push_back(event);
+    }
 
 done:
+
+    taskEXIT_CRITICAL_FROM_ISR(uxSavedInterruptStatus);
 
     return;
 }
