@@ -130,6 +130,8 @@ static void meshtastic_task(__unused void *params)
     last_heartbeat = now;
     last_want_config = 0;
 
+    meshroom->addMorseText("s");
+
     for (;;) {
         now = time(NULL);
 
