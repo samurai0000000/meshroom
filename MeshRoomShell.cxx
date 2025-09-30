@@ -114,11 +114,13 @@ int MeshRoomShell::rx_read(uint8_t *buf, size_t size)
 
 int MeshRoomShell::system(int argc, char **argv)
 {
+    int ret = 0;
     extern char __StackLimit, __bss_end__;
     struct mallinfo m = mallinfo();
     unsigned int total_heap = &__StackLimit  - &__bss_end__;
     unsigned int used_heap = m.uordblks;
     unsigned int free_heap = total_heap - used_heap;
+    char cTaskListBuffer[512];
 
     SimpleShell::system(argc, argv);
     this->printf("Total Heap: %8u bytes\n", total_heap);
@@ -132,8 +134,14 @@ int MeshRoomShell::system(int argc, char **argv)
         this->printf("clk_adc:  %lu Hz\n", clock_get_hz(clk_adc));
         this->printf("clk_peri: %lu Hz\n", clock_get_hz(clk_peri));
     }
+    bzero(cTaskListBuffer, sizeof(cTaskListBuffer));
+    vTaskListTasks(cTaskListBuffer, sizeof(cTaskListBuffer));
+    this->printf("  FreeRTOS:\n");
+    this->printf("Name        State  Priority  StackRem   Task#   CPU Affn\n");
+    this->printf("--------------------------------------------------------\n");
+    this->printf("%s", cTaskListBuffer);
 
-    return 0;
+    return ret;
 }
 
 int MeshRoomShell::reboot(int argc, char **argv)

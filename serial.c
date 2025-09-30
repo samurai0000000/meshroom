@@ -31,9 +31,9 @@
 #define UART_STOP_BITS    1
 #define UART_PARITY       UART_PARITY_NONE
 
-#define SERIAL_PBUF_SIZE  256
+#define SERIAL_PBUF_SIZE  512
 
-#define SERIAL_BUF_BUF_SIZE  256
+#define SERIAL_BUF_BUF_SIZE  512
 
 struct serial_buf {
     unsigned int rp;

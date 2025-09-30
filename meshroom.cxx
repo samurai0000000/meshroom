@@ -25,18 +25,20 @@
 
 #define USE_WATCHDOG_TIMER
 
-#define LED_TASK_STACK_SIZE            (2 * 1024)
-#define LED_TASK_PRIORITY              (tskIDLE_PRIORITY + 4UL)
+#define WATCHDOG_TASK_STACK_SIZE       (1 * 1024)
+#define WATCHDOG_TASK_PRIORITY         (tskIDLE_PRIORITY + 1UL)
+#define LED_TASK_STACK_SIZE            (1 * 1024)
+#define LED_TASK_PRIORITY              (tskIDLE_PRIORITY + 2UL)
+#define MORSEBUZZER_TASK_STACK_SIZE    (1 * 1024)
+#define MORSEBUZZER_TASK_PRIORITY      (tskIDLE_PRIORITY + 3UL)
+#define MESHTASTIC_TASK_STACK_SIZE     (8 * 1024)
+#define MESHTASTIC_TASK_PRIORITY       (tskIDLE_PRIORITY + 4UL)
 #if defined(LIB_PICO_STDIO_USB)
-#define CONSOLE_TASK_STACK_SIZE        (6 * 1024)
-#define CONSOLE_TASK_PRIORITY          (tskIDLE_PRIORITY + 3UL)
+#define CONSOLE_TASK_STACK_SIZE        (2 * 1024)
+#define CONSOLE_TASK_PRIORITY          (tskIDLE_PRIORITY + 5UL)
 #endif
-#define CONSOLE2_TASK_STACK_SIZE       (6 * 1024)
-#define CONSOLE2_TASK_PRIORITY         (tskIDLE_PRIORITY + 2UL)
-#define MESHTASTIC_TASK_STACK_SIZE     (12 * 1024)
-#define MESHTASTIC_TASK_PRIORITY       (tskIDLE_PRIORITY + 1UL)
-#define MORSEBUZZER_TASK_STACK_SIZE    (2 * 1024)
-#define MORSEBUZZER_TASK_PRIORITY      (tskIDLE_PRIORITY + 5UL)
+#define CONSOLE2_TASK_STACK_SIZE       (2 * 1024)
+#define CONSOLE2_TASK_PRIORITY         (tskIDLE_PRIORITY + 6UL)
 
 shared_ptr<MeshRoom> meshroom = NULL;
 static shared_ptr<MeshRoomShell> shell = NULL;
@@ -49,20 +51,100 @@ static string built = string("Built: ") +
     string(MYPROJECT_HOSTNAME) + string(" ") + string(MYPROJECT_DATE);
 static string copyright = string("Copyright (C) 2025, Charles Chiou");
 
-static void led_task(__unused void *params)
+static void watchdog_task(__unused void *params)
 {
 #if defined(USE_WATCHDOG_TIMER)
     watchdog_enable(5000, true);
     watchdog_enable_caused_reboot();
-#endif
 
     for (;;) {
-        meshroom->flipOnboardLed();
-        vTaskDelay(pdMS_TO_TICKS(1000));
-
-#if defined(USE_WATCHDOG_TIMER)
         watchdog_update();
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
 #endif
+}
+
+static void led_task(__unused void *params)
+{
+    for (;;) {
+        meshroom->flipOnboardLed();
+        if ((meshroom->meshDeviceLastRecivedSecondsAgo() <= 1) ||
+            (meshroom->isMorseEmpty() == false)) {
+            meshroom->setAlertLed(true);
+        } else {
+            meshroom->setAlertLed(false);
+        }
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
+static void morsebuzzer_task(__unused void *params)
+{
+    for (;;) {
+        meshroom->runMorseThread();
+    }
+}
+
+static void meshtastic_task(__unused void *params)
+{
+    int ret = 0;
+    time_t now, last_want_config, last_heartbeat;
+
+    if (meshroom->loadNvm() == false) {
+        meshroom->saveNvm();
+    }
+    meshroom->applyNvmToHomeChat();
+
+    now = time(NULL);
+    last_heartbeat = now;
+    last_want_config = now;
+
+    meshroom->addMorseText("s");
+
+    for (;;) {
+        now = time(NULL);
+
+        if (meshroom->isConnected() &&
+            (meshroom->meshDeviceLastRecivedSecondsAgo() > 300) &&
+            (meshroom->getLastResetSecsAgo() > 300)) {
+            consoles_printf("detected meshtastic stuck!\n");
+            meshroom->reset();
+        }
+
+        if (!meshroom->isConnected() && ((now - last_want_config) >= 5)) {
+            ret = meshroom->sendWantConfig();
+            if (ret == false) {
+                consoles_printf("sendWantConfig failed!\n");
+            }
+
+            last_want_config = now;
+        } else if (meshroom->isConnected()) {
+            last_want_config = now;
+        }
+
+        if (meshroom->isConnected() &&
+            ((now - last_heartbeat) >= 60)) {
+            ret = meshroom->sendHeartbeat();
+            if (ret == false) {
+                consoles_printf("sendHeartbeat failed!\n");
+            }
+
+            last_heartbeat = now;
+        }
+
+        for (;;) {
+            ret = serial_rx_ready();
+            if (ret == 0) {
+                break;
+            } if (ret > 0) {
+                ret = mt_serial_process(&meshroom->_mtc, 0);
+                if (ret < 0) {
+                    consoles_printf("mt_serial_process failed!\n");
+                }
+            }
+        }
+
+        xSemaphoreTake(uart1_sem, pdMS_TO_TICKS(1000));
     }
 }
 
@@ -116,85 +198,35 @@ static void console2_task(__unused void *params)
     }
 }
 
-static void meshtastic_task(__unused void *params)
+
+void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
 {
-    int ret = 0;
-    time_t now, last_want_config, last_heartbeat;
+    (void)(xTask);
 
-    if (meshroom->loadNvm() == false) {
-        meshroom->saveNvm();
-    }
-    meshroom->applyNvmToHomeChat();
-
-    now = time(NULL);
-    last_heartbeat = now;
-    last_want_config = 0;
-
-    meshroom->addMorseText("s");
-
-    for (;;) {
-        now = time(NULL);
-
-        if (meshroom->isConnected() &&
-            (meshroom->meshDeviceLastRecivedSecondsAgo() > 300) &&
-            (meshroom->getLastResetSecsAgo() > 300)) {
-            consoles_printf("detected meshtastic stuck!\n");
-            meshroom->reset();
-        }
-
-        if (!meshroom->isConnected() && ((now - last_want_config) >= 5)) {
-            ret = meshroom->sendWantConfig();
-            if (ret == false) {
-                consoles_printf("sendWantConfig failed!\n");
-            }
-
-            last_want_config = now;
-        } else if (meshroom->isConnected()) {
-            last_want_config = now;
-        }
-
-        if (meshroom->isConnected() &&
-            ((now - last_heartbeat) >= 60)) {
-            ret = meshroom->sendHeartbeat();
-            if (ret == false) {
-                consoles_printf("sendHeartbeat failed!\n");
-            }
-
-            last_heartbeat = now;
-        }
-
-        for (;;) {
-            ret = serial_rx_ready();
-            if (ret == 0) {
-                break;
-            } if (ret > 0) {
-                ret = mt_serial_process(&meshroom->_mtc, 0);
-                if (ret < 0) {
-                    consoles_printf("mt_serial_process failed!\n");
-                }
-            }
-        }
-
-        xSemaphoreTake(uart1_sem, pdMS_TO_TICKS(1000));
-    }
+#if defined(LIB_PICO_STDIO_USB)
+    console_printf("stack over-flow: %s!\n", pcTaskName);
+#endif
+    console2_printf("stack over-flow: %s!\n", pcTaskName);
+    for (;;);
 }
 
-static void morsebuzzer_task(__unused void *params)
+void vApplicationIdleHook(void)
 {
-    for (;;) {
-        meshroom->runMorseThread();
-    }
+
 }
 
 int main(void)
 {
+#if defined(USE_WATCHDOG_TIMER)
+    TaskHandle_t watchdogTask;
+#endif
     TaskHandle_t ledTask;
+    TaskHandle_t morsebuzzerTask;
+    TaskHandle_t meshtasticTask;
 #if defined(LIB_PICO_STDIO_USB)
     TaskHandle_t consoleTask;
 #endif
     TaskHandle_t console2Task;
-    TaskHandle_t meshtasticTask;
-    TaskHandle_t morsebuzzerTask;
 
     stdio_init_all();
     serial_init();
@@ -222,16 +254,39 @@ int main(void)
     shell2->setNvm(meshroom);
     shell2->attach((void *) 2);
 
+#if defined(USE_WATCHDOG_TIMER)
+    xTaskCreate(watchdog_task,
+                "Watchdog",
+                WATCHDOG_TASK_STACK_SIZE,
+                NULL,
+                WATCHDOG_TASK_PRIORITY,
+                &watchdogTask);
+#endif
+
     xTaskCreate(led_task,
-                "LedTask",
+                "Led",
                 LED_TASK_STACK_SIZE,
                 NULL,
                 LED_TASK_PRIORITY,
                 &ledTask);
 
+    xTaskCreate(morsebuzzer_task,
+                "MorseBuzzer",
+                MORSEBUZZER_TASK_STACK_SIZE,
+                NULL,
+                MORSEBUZZER_TASK_PRIORITY,
+                &morsebuzzerTask);
+
+    xTaskCreate(meshtastic_task,
+                "Meshtastic",
+                MESHTASTIC_TASK_STACK_SIZE,
+                NULL,
+                MESHTASTIC_TASK_PRIORITY,
+                &meshtasticTask);
+
 #if defined(LIB_PICO_STDIO_USB)
     xTaskCreate(console_task,
-                "ConsoleTask",
+                "Console",
                 CONSOLE_TASK_STACK_SIZE,
                 NULL,
                 CONSOLE_TASK_PRIORITY,
@@ -239,50 +294,28 @@ int main(void)
 #endif
 
     xTaskCreate(console2_task,
-                "Console2Task",
+                "Console2",
                 CONSOLE2_TASK_STACK_SIZE,
                 NULL,
                 CONSOLE2_TASK_PRIORITY,
                 &console2Task);
 
-    xTaskCreate(meshtastic_task,
-                "MeshtasticThread",
-                MESHTASTIC_TASK_STACK_SIZE,
-                NULL,
-                MESHTASTIC_TASK_PRIORITY,
-                &meshtasticTask);
-
-    xTaskCreate(morsebuzzer_task,
-                "MorseBuzzerTask",
-                MORSEBUZZER_TASK_STACK_SIZE,
-                NULL,
-                MORSEBUZZER_TASK_PRIORITY,
-                &morsebuzzerTask);
-
 #if defined(configUSE_CORE_AFFINITY) && (configNUMBER_OF_CORES > 1)
-    vTaskCoreAffinitySet(ledTask, 0x2);
+#if defined(USE_WATCHDOG_TIMER)
+    vTaskCoreAffinitySet(watchdogTask, 0x1);
+#endif
+    vTaskCoreAffinitySet(ledTask, 0x1);
+    vTaskCoreAffinitySet(morsebuzzerTask, 0x2);
+    vTaskCoreAffinitySet(meshtasticTask, 0x1);
 #if defined(LIB_PICO_STDIO_USB)
-    vTaskCoreAffinitySet(consoleTask, 0x1);
+    vTaskCoreAffinitySet(consoleTask, 0x2);
 #endif
     vTaskCoreAffinitySet(console2Task, 0x2);
-    vTaskCoreAffinitySet(meshtasticTask, 0x1);
-    vTaskCoreAffinitySet(morsebuzzerTask, 0x2);
 #endif
 
     vTaskStartScheduler();
 
     return 0;
-}
-
-void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
-{
-    (void)(xTask);
-
-#if defined(LIB_PICO_STDIO_USB)
-    console_printf("stack over-flow: %s!\n", pcTaskName);
-#endif
-    console2_printf("stack over-flow: %s!\n", pcTaskName);
-    for (;;);
 }
 
 /*

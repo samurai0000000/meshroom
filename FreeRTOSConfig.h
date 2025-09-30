@@ -10,7 +10,7 @@
 /* Scheduler Related */
 #define configUSE_PREEMPTION                    1
 #define configUSE_TICKLESS_IDLE                 1
-#define configUSE_IDLE_HOOK                     0
+#define configUSE_IDLE_HOOK                     1
 #define configUSE_TICK_HOOK                     0
 #define configTICK_RATE_HZ                      ((TickType_t) 100)
 #define configMAX_PRIORITIES                    32
@@ -54,7 +54,7 @@
 /* Run time and task stats gathering related definitions. */
 #define configGENERATE_RUN_TIME_STATS           0
 #define configUSE_TRACE_FACILITY                1
-#define configUSE_STATS_FORMATTING_FUNCTIONS    0
+#define configUSE_STATS_FORMATTING_FUNCTIONS    1
 
 /* Co-routine related definitions. */
 #define configUSE_CO_ROUTINES                   0

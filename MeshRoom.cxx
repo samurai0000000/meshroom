@@ -748,8 +748,6 @@ void MeshRoom::toggleBuzzer(bool onOff)
     } else {
         gpio_put(BUZZER_PIN, false);
     }
-
-    setAlertLed(onOff);
 }
 
 /*

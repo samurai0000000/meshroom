@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.13)
 
 include (pico-sdk/external/pico_sdk_import.cmake)
 
-project(meshmon VERSION 1.4.9 LANGUAGES C CXX ASM)
+project(meshmon VERSION 1.4.10 LANGUAGES C CXX ASM)
 include(FreeRTOS_Kernel_import.cmake)
 
 set(PICO_CXX_ENABLE_EXCEPTIONS 1)
@@ -24,6 +24,7 @@ set(CMAKE_CXX_STANDARD 17)
 include_directories(${CMAKE_CURRENT_LIST_DIR})
 add_compile_options(-Wall -Wextra -Werror -Wno-unused-variable -Wno-psabi)
 add_compile_options(-g -Os)
+add_compile_definitions(TUD_OPT_RP2040_USB_DEVICE_ENUMERATION_FIX=1)
 
 set(WHOAMI_OUTPUT)
 execute_process(
