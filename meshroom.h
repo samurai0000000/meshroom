@@ -23,11 +23,9 @@
 #endif
 #endif
 
-#include "serial.h"
+#include <pico-plat.h>
 
 EXTERN_C_BEGIN
-
-#define MEASURE_CPU_UTILIZATION
 
 extern void led_init(void);
 extern void led_set(bool on);
@@ -35,6 +33,9 @@ extern void led_set(bool on);
 extern void shell_init(void);
 extern int shell_process(void);
 extern int shell2_process(void);
+
+extern int consoles_printf(const char *format, ...);
+extern int consoles_vprintf(const char *format, va_list ap);
 
 EXTERN_C_END
 

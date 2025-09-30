@@ -13,8 +13,9 @@
 #include <pico/bootrom.h>
 #include <FreeRTOS.h>
 #include <task.h>
+#include <pico-plat.h>
+#include <PicoPlatform.hxx>
 #include <libmeshtastic.h>
-#include <serial.h>
 #include <MeshRoom.hxx>
 #include <MeshRoomShell.hxx>
 
@@ -43,11 +44,9 @@ int MeshRoomShell::tx_write(const uint8_t *buf, size_t size)
     int console_id = (int) _ctx;
 
     if (console_id == 1) {
-#if defined(LIB_PICO_STDIO_USB)
-        ret = console_write(buf, size);
-#endif
+        ret = usbcdc_write(buf, size);
     } else if (console_id == 2) {
-        ret = console2_write(buf, size);
+        ret = serial0_write(buf, size);
     } else {
         ret = -1;
     }
@@ -63,11 +62,9 @@ int MeshRoomShell::printf(const char *format, ...)
 
     va_start(ap, format);
     if (console_id == 1) {
-#if defined(LIB_PICO_STDIO_USB)
-        ret = console_vprintf(format, ap);
-#endif
+        ret = usbcdc_vprintf(format, ap);
     } else if (console_id == 2) {
-        ret = console2_vprintf(format, ap);
+        ret = serial0_vprintf(format, ap);
     } else {
         ret = -1;
     }
@@ -82,11 +79,9 @@ int MeshRoomShell::rx_ready(void) const
     int console_id = (int) _ctx;
 
     if (console_id == 1) {
-#if defined(LIB_PICO_STDIO_USB)
-        ret = console_rx_ready();
-#endif
+        ret = usbcdc_rx_ready();
     } else if (console_id == 2) {
-        ret = console2_rx_ready();
+        ret = serial0_rx_ready();
     } else {
         ret = -1;
     }
@@ -100,11 +95,9 @@ int MeshRoomShell::rx_read(uint8_t *buf, size_t size)
     int console_id = (int) _ctx;
 
     if (console_id == 1) {
-#if defined(LIB_PICO_STDIO_USB)
-        ret = console_read(buf, size);
-#endif
+        ret = usbcdc_read(buf, size);
     } else if (console_id == 2) {
-        ret = console2_read(buf, size);
+        ret = serial0_read(buf, size);
     } else {
         ret = -1;
     }
@@ -123,6 +116,7 @@ int MeshRoomShell::system(int argc, char **argv)
     char cTaskListBuffer[512];
 
     SimpleShell::system(argc, argv);
+    this->printf("  Platform: %s\n", PicoPlatform::get()->getName().c_str());
     this->printf("Total Heap: %8u bytes\n", total_heap);
     this->printf(" Free Heap: %8u bytes\n", free_heap);
     this->printf(" Used Heap: %8u bytes\n", used_heap);
@@ -149,9 +143,10 @@ int MeshRoomShell::reboot(int argc, char **argv)
     (void)(argc);
     (void)(argv);
 
+    this->printf("Disconnect from meshtastic\n");
     meshroom->sendDisconnect();
-    watchdog_enable(1, 0);
-    for (;;);
+    this->printf("Rebooting ...\n");
+    PicoPlatform::get()->reboot();
 
     return 0;
 }
@@ -170,8 +165,8 @@ int MeshRoomShell::bootsel(int argc, char **argv)
     (void)(argv);
 
     meshroom->sendDisconnect();
-    this->printf("Rebooting to BOOTSEL mode\n");
-    reset_usb_boot(0, 0);
+    this->printf("Rebooting to BOOTSEL mode ...\n");
+    PicoPlatform::get()->bootsel();
 
     return 0;
 }

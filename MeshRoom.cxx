@@ -9,13 +9,13 @@
 #include <pico/stdlib.h>
 #include <pico/flash.h>
 #include <hardware/flash.h>
-#include <hardware/adc.h>
 #include <hardware/sync.h>
 #include <FreeRTOS.h>
 #include <task.h>
 #include <algorithm>
 #include <sstream>
 #include <iomanip>
+#include <PicoPlatform.hxx>
 #include <meshroom.h>
 #include <MeshRoom.hxx>
 
@@ -64,15 +64,6 @@ MeshRoom::MeshRoom()
     gpio_init(ALERT_LED_PIN);
     gpio_set_dir(ALERT_LED_PIN, GPIO_OUT);
     setAlertLed(false);
-
-    gpio_init(ONBOARD_LED_PIN);
-    gpio_set_dir(ONBOARD_LED_PIN, GPIO_OUT);
-    setOnboardLed(false);
-
-    adc_init();
-    adc_set_temp_sensor_enabled(true);
-    adc_select_input(4);
-
 }
 
 MeshRoom::~MeshRoom()
@@ -330,33 +321,14 @@ void MeshRoom::flipAlertLed(void)
     gpio_put(ALERT_LED_PIN, _alertLed);
 }
 
-bool MeshRoom::isOnboardLedOn(void) const
-{
-    return _onboardLed;
-}
-
-void MeshRoom::setOnboardLed(bool onOff)
-{
-    _onboardLed = onOff;
-    gpio_put(ONBOARD_LED_PIN, onOff);
-}
-
 void MeshRoom::flipOnboardLed(void)
 {
-    _onboardLed = !_onboardLed;
-    gpio_put(ONBOARD_LED_PIN, _onboardLed);
+    PicoPlatform::get()->flipOnboardLed();
 }
 
 float MeshRoom::getOnboardTempC(void) const
 {
-    static const float conversionFactor = 3.3f / (1 << 12);
-    float adc;
-    float temperature_c = 0.0;
-
-    adc = (float) adc_read() * conversionFactor;
-    temperature_c = 27.0f - (adc - 0.706f) / 0.001721f;
-
-    return temperature_c;
+    return PicoPlatform::get()->getOnboardTempC();
 }
 
 void MeshRoom::gotTextMessage(const meshtastic_MeshPacket &packet,

@@ -7,3 +7,6 @@
 [submodule "FreeRTOS-Kernel"]
 	path = FreeRTOS-Kernel
 	url = https://github.com/raspberrypi/FreeRTOS-Kernel
+[submodule "pico-plat"]
+	path = pico-plat
+	url = https://github.com/samurai0000000/pico-plat

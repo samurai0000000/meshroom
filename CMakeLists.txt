@@ -4,27 +4,33 @@
 
 cmake_minimum_required(VERSION 3.13)
 
-include (pico-sdk/external/pico_sdk_import.cmake)
+include(pico-sdk/external/pico_sdk_import.cmake)
 
-project(meshmon VERSION 1.4.10 LANGUAGES C CXX ASM)
+project(meshmon VERSION 1.4.11 LANGUAGES C CXX ASM)
 include(FreeRTOS_Kernel_import.cmake)
-
-set(PICO_CXX_ENABLE_EXCEPTIONS 1)
-set(PICO_USE_STACK_GUARDS 1)
-set(PICO_STACK_SIZE 2048)
-set(PICO_CORE1_STACK_SIZE 2048)
-
-pico_sdk_init()
-
-add_subdirectory(libmeshtastic)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 
+add_subdirectory(pico-plat)
+add_subdirectory(libmeshtastic)
+
 include_directories(${CMAKE_CURRENT_LIST_DIR})
-add_compile_options(-Wall -Wextra -Werror -Wno-unused-variable -Wno-psabi)
+add_compile_options(-Wall -Wextra -Werror)
+add_compile_options(-g -O2)
+
+set(PICO_CXX_ENABLE_EXCEPTIONS 1)
+set(PICO_USE_STACK_GUARDS 1)
+
+pico_sdk_init()
+
+include_directories(${CMAKE_CURRENT_LIST_DIR})
+add_compile_options(-Wall -Wextra -Werror
+  -Wno-unused-variable
+  -Wno-unused-but-set-variable
+  -Wno-unused-parameter
+  -Wno-psabi)
 add_compile_options(-g -Os)
-add_compile_definitions(TUD_OPT_RP2040_USB_DEVICE_ENUMERATION_FIX=1)
 
 set(WHOAMI_OUTPUT)
 execute_process(
@@ -57,20 +63,22 @@ configure_file(
   )
 
 add_executable(meshroom
-  serial.c
   MeshRoom.cxx
   MeshRoomShell.cxx
   meshroom.cxx)
 pico_enable_stdio_usb(meshroom 0)
 pico_enable_stdio_uart(meshroom 0)
-target_compile_definitions(meshroom PRIVATE PICO_STACK_SIZE=${PICO_STACK_SIZE})
 target_include_directories(meshroom PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(meshroom
-  libmeshtastic
   pico_stdlib
-  hardware_flash
-  pico_multicore
+  tinyusb_device
+  tinyusb_board
   hardware_adc
+  hardware_spi
+  hardware_i2c
+  pico_cyw43_arch_none
   FreeRTOS-Kernel-Heap4
+  pico-plat
+  libmeshtastic
   )
 pico_add_extra_outputs(meshroom)

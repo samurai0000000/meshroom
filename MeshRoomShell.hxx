@@ -16,7 +16,6 @@ class MeshRoomShell : public SimpleShell {
 public:
 
     MeshRoomShell(shared_ptr<SimpleClient> client = NULL);
-
     ~MeshRoomShell();
 
 protected:

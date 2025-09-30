@@ -7,42 +7,42 @@
 #include <time.h>
 #include <pico/stdlib.h>
 #include <pico/time.h>
-#include <pico/multicore.h>
+#include <pico/cyw43_arch.h>
 #include <hardware/uart.h>
 #include <hardware/sync.h>
 #include <hardware/watchdog.h>
 #include <hardware/clocks.h>
 #include <hardware/pll.h>
+#include <tusb.h>
+#include <bsp/board_api.h>
 #include <FreeRTOS.h>
 #include <task.h>
 #include <semphr.h>
-#include <libmeshtastic.h>
 #include <memory>
+#include <libmeshtastic.h>
 #include <MeshRoom.hxx>
 #include <MeshRoomShell.hxx>
 #include <meshroom.h>
 #include "version.h"
 
-#define USE_WATCHDOG_TIMER
-
-#define WATCHDOG_TASK_STACK_SIZE       (1 * 1024)
-#define WATCHDOG_TASK_PRIORITY         (tskIDLE_PRIORITY + 1UL)
-#define LED_TASK_STACK_SIZE            (1 * 1024)
-#define LED_TASK_PRIORITY              (tskIDLE_PRIORITY + 2UL)
-#define MORSEBUZZER_TASK_STACK_SIZE    (1 * 1024)
-#define MORSEBUZZER_TASK_PRIORITY      (tskIDLE_PRIORITY + 3UL)
-#define MESHTASTIC_TASK_STACK_SIZE     (8 * 1024)
-#define MESHTASTIC_TASK_PRIORITY       (tskIDLE_PRIORITY + 4UL)
-#if defined(LIB_PICO_STDIO_USB)
-#define CONSOLE_TASK_STACK_SIZE        (2 * 1024)
-#define CONSOLE_TASK_PRIORITY          (tskIDLE_PRIORITY + 5UL)
-#endif
-#define CONSOLE2_TASK_STACK_SIZE       (2 * 1024)
-#define CONSOLE2_TASK_PRIORITY         (tskIDLE_PRIORITY + 6UL)
+#define WATCHDOG_TASK_STACK_SIZE       1024
+#define WATCHDOG_TASK_PRIORITY         30
+#define LED_TASK_STACK_SIZE            1024
+#define LED_TASK_PRIORITY              25
+#define USB_TASK_STACK_SIZE            2048
+#define USB_TASK_PRIORITY              20
+#define MORSEBUZZER_TASK_STACK_SIZE    1024
+#define MORSEBUZZER_TASK_PRIORITY      29
+#define MESHTASTIC_TASK_STACK_SIZE     4096
+#define MESHTASTIC_TASK_PRIORITY       15
+#define SHELL0_TASK_STACK_SIZE         2048
+#define SHELL0_TASK_PRIORITY           10
+#define SHELL1_TASK_STACK_SIZE         2048
+#define SHELL1_TASK_PRIORITY           10
 
 shared_ptr<MeshRoom> meshroom = NULL;
-static shared_ptr<MeshRoomShell> shell = NULL;
-static shared_ptr<MeshRoomShell> shell2 = NULL;
+static shared_ptr<MeshRoomShell> shell0 = NULL;
+static shared_ptr<MeshRoomShell> shell1 = NULL;
 
 static string banner = "The meshroom firmware for Raspberry Pi Pico";
 static string version = string("Version: ") + string(MYPROJECT_VERSION_STRING);
@@ -53,7 +53,6 @@ static string copyright = string("Copyright (C) 2025, Charles Chiou");
 
 static void watchdog_task(__unused void *params)
 {
-#if defined(USE_WATCHDOG_TIMER)
     watchdog_enable(5000, true);
     watchdog_enable_caused_reboot();
 
@@ -61,7 +60,6 @@ static void watchdog_task(__unused void *params)
         watchdog_update();
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
-#endif
 }
 
 static void led_task(__unused void *params)
@@ -75,6 +73,14 @@ static void led_task(__unused void *params)
             meshroom->setAlertLed(false);
         }
         vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
+static void usb_task(__unused void *params)
+{
+    for (;;) {
+        usbcdc_task();
+        taskYIELD();
     }
 }
 
@@ -133,7 +139,7 @@ static void meshtastic_task(__unused void *params)
         }
 
         for (;;) {
-            ret = serial_rx_ready();
+            ret = serial1_rx_ready();
             if (ret == 0) {
                 break;
             } if (ret > 0) {
@@ -144,69 +150,81 @@ static void meshtastic_task(__unused void *params)
             }
         }
 
+        ret = serial1_check_markers();
+        if (ret != 0) {
+            consoles_printf("serial1 markers violated: %d\n", ret);
+        }
+
         xSemaphoreTake(uart1_sem, pdMS_TO_TICKS(1000));
     }
 }
 
-#if defined(LIB_PICO_STDIO_USB)
-
-static void console_task(__unused void *params)
+static void shell0_task(__unused void *params)
 {
-    int ret;
-
     vTaskDelay(pdMS_TO_TICKS(1500));
 
-    console_printf("\n\x1b[2K");
-    console_printf("%s\n", shell->banner().c_str());
-    console_printf("%s\n", shell->version().c_str());
-    console_printf("%s\n", shell->built().c_str());
-    console_printf("-------------------------------------------\n");
-    console_printf("%s\n", shell->copyright().c_str());
-    console_printf("> ");
-
+    shell0->showWelcome();
     for (;;) {
+        int ret = 0;
         do {
-            ret = shell->process();
+            ret = shell0->process();
         } while (ret > 0);
-
-        vTaskDelay(pdMS_TO_TICKS(50));
+        xSemaphoreTake(cdc_sem, pdMS_TO_TICKS(1000));
     }
 }
 
-#endif  // LIB_PICO_STDIO_USB
-
-static void console2_task(__unused void *params)
+static void shell1_task(__unused void *params)
 {
-    int ret;
-
-    console2_printf("\n\x1b[2K");
-    console2_printf("%s\n", shell2->banner().c_str());
-    console2_printf("%s\n", shell2->version().c_str());
-    console2_printf("Pico SDK version: " PICO_SDK_VERSION_STRING "\n");
-    console2_printf("FreeRTOS version: " tskKERNEL_VERSION_NUMBER "\n");
-    console2_printf("%s\n", shell2->built().c_str());
-    console2_printf("-------------------------------------------\n");
-    console2_printf("%s\n", shell2->copyright().c_str());
-    console2_printf("> ");
+    serial0_printf("\n\x1b[2K");
+    shell1->showWelcome();
 
     for (;;) {
+        int ret = 0;
         do {
-            ret = shell2->process();
+            ret = shell1->process();
         } while (ret > 0);
+
+        ret = serial0_check_markers();
+        if (ret != 0) {
+            consoles_printf("serial0 markers violated: %d\n", ret);
+        }
 
         xSemaphoreTake(uart0_sem, pdMS_TO_TICKS(1000));
     }
 }
 
+int consoles_printf(const char *format, ...)
+{
+    int ret = 0;
+    va_list ap;
+
+    va_start(ap, format);
+    ret = usbcdc_vprintf(format, ap);
+    va_end(ap);
+
+    va_start(ap, format);
+    ret = serial0_vprintf(format, ap);
+    va_end(ap);
+
+    return ret;
+}
+
+int consoles_vprintf(const char *format, va_list ap)
+{
+    int ret = 0;
+
+    ret = usbcdc_vprintf(format, ap);
+    ret = serial0_vprintf(format, ap);
+
+    return ret;
+}
 
 void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
 {
     (void)(xTask);
 
-#if defined(LIB_PICO_STDIO_USB)
-    console_printf("stack over-flow: %s!\n", pcTaskName);
-#endif
-    console2_printf("stack over-flow: %s!\n", pcTaskName);
+    usbcdc_printf("stack over-flow: %s!\n", pcTaskName);
+    serial0_printf("stack over-flow: %s!\n", pcTaskName);
     for (;;);
 }
 
@@ -217,51 +235,53 @@ void vApplicationIdleHook(void)
 
 int main(void)
 {
-#if defined(USE_WATCHDOG_TIMER)
     TaskHandle_t watchdogTask;
-#endif
     TaskHandle_t ledTask;
+    TaskHandle_t usbTask;
     TaskHandle_t morsebuzzerTask;
     TaskHandle_t meshtasticTask;
-#if defined(LIB_PICO_STDIO_USB)
-    TaskHandle_t consoleTask;
-#endif
-    TaskHandle_t console2Task;
+    TaskHandle_t shell0Task;
+    TaskHandle_t shell1Task;
 
+    board_init();
+    tusb_init();
     stdio_init_all();
+    if (board_init_after_tusb) {
+        board_init_after_tusb();
+    }
+    usbcdc_init();
     serial_init();
+    cyw43_arch_init();
 
     meshroom = make_shared<MeshRoom>();
     meshroom->setClient(meshroom);
     meshroom->setNvm(meshroom);
     meshroom->sendDisconnect();
 
-    shell = make_shared<MeshRoomShell>();
-    shell->setBanner(banner);
-    shell->setVersion(version);
-    shell->setBuilt(built);
-    shell->setCopyright(copyright);
-    shell->setClient(meshroom);
-    shell->setNvm(meshroom);
-    shell->attach((void *) 1);
+    shell0 = make_shared<MeshRoomShell>();
+    shell0->setBanner(banner);
+    shell0->setVersion(version);
+    shell0->setBuilt(built);
+    shell0->setCopyright(copyright);
+    shell0->setClient(meshroom);
+    shell0->setNvm(meshroom);
+    shell0->attach((void *) 1);
 
-    shell2 = make_shared<MeshRoomShell>();
-    shell2->setBanner(banner);
-    shell2->setVersion(version);
-    shell2->setBuilt(built);
-    shell2->setCopyright(copyright);
-    shell2->setClient(meshroom);
-    shell2->setNvm(meshroom);
-    shell2->attach((void *) 2);
+    shell1 = make_shared<MeshRoomShell>();
+    shell1->setBanner(banner);
+    shell1->setVersion(version);
+    shell1->setBuilt(built);
+    shell1->setCopyright(copyright);
+    shell1->setClient(meshroom);
+    shell1->setNvm(meshroom);
+    shell1->attach((void *) 2);
 
-#if defined(USE_WATCHDOG_TIMER)
     xTaskCreate(watchdog_task,
                 "Watchdog",
                 WATCHDOG_TASK_STACK_SIZE,
                 NULL,
                 WATCHDOG_TASK_PRIORITY,
                 &watchdogTask);
-#endif
 
     xTaskCreate(led_task,
                 "Led",
@@ -269,6 +289,13 @@ int main(void)
                 NULL,
                 LED_TASK_PRIORITY,
                 &ledTask);
+
+    xTaskCreate(usb_task,
+                "USB",
+                USB_TASK_STACK_SIZE,
+                NULL,
+                USB_TASK_PRIORITY,
+                &usbTask);
 
     xTaskCreate(morsebuzzer_task,
                 "MorseBuzzer",
@@ -284,33 +311,28 @@ int main(void)
                 MESHTASTIC_TASK_PRIORITY,
                 &meshtasticTask);
 
-#if defined(LIB_PICO_STDIO_USB)
-    xTaskCreate(console_task,
-                "Console",
-                CONSOLE_TASK_STACK_SIZE,
+    xTaskCreate(shell0_task,
+                "Shell0",
+                SHELL0_TASK_STACK_SIZE,
                 NULL,
-                CONSOLE_TASK_PRIORITY,
-                &consoleTask);
-#endif
+                SHELL0_TASK_PRIORITY,
+                &shell0Task);
 
-    xTaskCreate(console2_task,
-                "Console2",
-                CONSOLE2_TASK_STACK_SIZE,
+    xTaskCreate(shell1_task,
+                "Shell1",
+                SHELL1_TASK_STACK_SIZE,
                 NULL,
-                CONSOLE2_TASK_PRIORITY,
-                &console2Task);
+                SHELL1_TASK_PRIORITY,
+                &shell1Task);
 
 #if defined(configUSE_CORE_AFFINITY) && (configNUMBER_OF_CORES > 1)
-#if defined(USE_WATCHDOG_TIMER)
     vTaskCoreAffinitySet(watchdogTask, 0x1);
-#endif
     vTaskCoreAffinitySet(ledTask, 0x1);
-    vTaskCoreAffinitySet(morsebuzzerTask, 0x2);
-    vTaskCoreAffinitySet(meshtasticTask, 0x1);
-#if defined(LIB_PICO_STDIO_USB)
-    vTaskCoreAffinitySet(consoleTask, 0x2);
-#endif
-    vTaskCoreAffinitySet(console2Task, 0x2);
+    vTaskCoreAffinitySet(usbTask, 0x1);
+    vTaskCoreAffinitySet(morsebuzzerTask, 0x1);
+    vTaskCoreAffinitySet(meshtasticTask, 0x2);
+    vTaskCoreAffinitySet(shell0Task, 0x2);
+    vTaskCoreAffinitySet(shell1Task, 0x2);
 #endif
 
     vTaskStartScheduler();

@@ -7,9 +7,6 @@ MAKEFLAGS =	--no-print-dir
 PICO_SDK_PATH :=	$(realpath pico-sdk)
 export PICO_SDK_PATH
 
-FREERTOS_KERNEL_PATH :=	$(realpath FreeRTOS-Kernel)
-export FREERTOS_KERNEL_PATH
-
 TARGETS +=	build/meshroom.uf2
 
 .PHONY: default clean distclean $(TARGETS)
@@ -31,7 +28,7 @@ build/meshroom.uf2: build/Makefile
 
 build/Makefile: CMakeLists.txt
 	@mkdir -p build
-	@cd build && cmake ..
+	@cd build && cmake -DPICO_BOARD=pico_w ..
 
 .PHONY: release
 

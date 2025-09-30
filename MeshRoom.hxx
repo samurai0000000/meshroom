@@ -20,7 +20,6 @@
 #define BUZZER_PIN       22
 #define IR_BLAST_PIN     17
 #define ALERT_LED_PIN    16
-#define ONBOARD_LED_PIN  25
 
 #define PUSHBUTTON_DURATION_THRESHOLD_US 1500000
 
@@ -106,8 +105,6 @@ public:
     void setAlertLed(bool onOff);
     void flipAlertLed(void);
 
-    bool isOnboardLedOn(void) const;
-    void setOnboardLed(bool onOff);
     void flipOnboardLed(void);
 
     float getOnboardTempC(void) const;
@@ -180,7 +177,6 @@ private:
     unsigned int _resetCount;
     time_t _lastReset;
     bool _alertLed;
-    bool _onboardLed;
 
 };
 
