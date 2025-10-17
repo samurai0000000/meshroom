@@ -6,7 +6,7 @@ cmake_minimum_required(VERSION 3.13)
 
 include(pico-sdk/external/pico_sdk_import.cmake)
 
-project(meshmon VERSION 1.4.11 LANGUAGES C CXX ASM)
+project(meshmon VERSION 1.4.12 LANGUAGES C CXX ASM)
 include(FreeRTOS_Kernel_import.cmake)
 
 set(CMAKE_C_STANDARD 11)

@@ -78,9 +78,6 @@ void MeshRoom::gpio_callback(uint gpio, uint32_t events)
         .ts = 0,
         .tdur = 0,
     };
-    UBaseType_t uxSavedInterruptStatus;
-
-    uxSavedInterruptStatus = taskENTER_CRITICAL_FROM_ISR();
 
     if (gpio != PUSHBUTTON_PIN) {
         goto done;
@@ -112,8 +109,6 @@ void MeshRoom::gpio_callback(uint gpio, uint32_t events)
     }
 
 done:
-
-    taskEXIT_CRITICAL_FROM_ISR(uxSavedInterruptStatus);
 
     return;
 }

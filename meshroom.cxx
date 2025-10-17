@@ -148,6 +148,7 @@ static void meshtastic_task(__unused void *params)
                     consoles_printf("mt_serial_process failed!\n");
                 }
             }
+            taskYIELD();
         }
 
         ret = serial1_check_markers();
@@ -254,24 +255,20 @@ int main(void)
     cyw43_arch_init();
 
     meshroom = make_shared<MeshRoom>();
+    meshroom->setBanner(banner);
+    meshroom->setVersion(version);
+    meshroom->setBuilt(built);
+    meshroom->setCopyright(copyright);
     meshroom->setClient(meshroom);
     meshroom->setNvm(meshroom);
     meshroom->sendDisconnect();
 
     shell0 = make_shared<MeshRoomShell>();
-    shell0->setBanner(banner);
-    shell0->setVersion(version);
-    shell0->setBuilt(built);
-    shell0->setCopyright(copyright);
     shell0->setClient(meshroom);
     shell0->setNvm(meshroom);
     shell0->attach((void *) 1);
 
     shell1 = make_shared<MeshRoomShell>();
-    shell1->setBanner(banner);
-    shell1->setVersion(version);
-    shell1->setBuilt(built);
-    shell1->setCopyright(copyright);
     shell1->setClient(meshroom);
     shell1->setNvm(meshroom);
     shell1->attach((void *) 2);
