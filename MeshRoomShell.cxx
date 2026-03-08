@@ -5,6 +5,7 @@
  */
 
 #include <malloc.h>
+#include <stdexcept>
 #include <pico/stdlib.h>
 #include <pico/time.h>
 #include <hardware/sync.h>
