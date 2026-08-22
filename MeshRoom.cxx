@@ -12,14 +12,31 @@
 #include <hardware/sync.h>
 #include <FreeRTOS.h>
 #include <task.h>
-#include <algorithm>
+#include <queue.h>
 #include <sstream>
 #include <iomanip>
 #include <PicoPlatform.hxx>
 #include <meshroom.h>
 #include <MeshRoom.hxx>
 
-extern shared_ptr<MeshRoom> meshroom;
+#define BUTTON_EVENT_QUEUE_LEN  5
+
+static QueueHandle_t button_event_queue = NULL;
+
+static uint32_t crc32_le(const uint8_t *data, size_t len)
+{
+    uint32_t crc = 0xffffffffu;
+
+    for (size_t i = 0; i < len; i++) {
+        crc ^= data[i];
+        for (int b = 0; b < 8; b++) {
+            uint32_t mask = -(crc & 1u);
+            crc = (crc >> 1) ^ (0xedb88320u & mask);
+        }
+    }
+
+    return ~crc;
+}
 
 MeshRoom::MeshRoom()
     : SimpleClient(), HomeChat(), BaseNvm(), MorseBuzzer()
@@ -38,6 +55,11 @@ MeshRoom::MeshRoom()
     _acFanDir = 0;
     _resetCount = 1;
     _lastReset = time(NULL);
+
+    if (button_event_queue == NULL) {
+        button_event_queue = xQueueCreate(BUTTON_EVENT_QUEUE_LEN,
+                                          sizeof(struct button_event));
+    }
 
     gpio_init(PUSHBUTTON_PIN);
     gpio_set_dir(PUSHBUTTON_PIN, GPIO_IN);
@@ -78,6 +100,7 @@ void MeshRoom::gpio_callback(uint gpio, uint32_t events)
         .ts = 0,
         .tdur = 0,
     };
+    BaseType_t woken = pdFALSE;
 
     if (gpio != PUSHBUTTON_PIN) {
         goto done;
@@ -103,9 +126,9 @@ void MeshRoom::gpio_callback(uint gpio, uint32_t events)
         }
     }
 
-
-    if (meshroom->_buttonEvents.size() < 5) {
-        meshroom->_buttonEvents.push_back(event);
+    if (button_event_queue != NULL) {
+        xQueueSendFromISR(button_event_queue, &event, &woken);
+        portYIELD_FROM_ISR(woken);
     }
 
 done:
@@ -116,16 +139,19 @@ done:
 bool MeshRoom::getButtonEvent(struct button_event &event, bool clearOld)
 {
     bool result = false;
+    struct button_event latest;
 
-    if (_buttonEvents.empty()) {
+    if (button_event_queue == NULL) {
         goto done;
     }
 
     if (clearOld) {
-        event = _buttonEvents.back();
-        _buttonEvents.clear();
-    } else {
-        event = _buttonEvents.front();
+        while (xQueueReceive(button_event_queue, &latest, 0) == pdTRUE) {
+            event = latest;
+            result = true;
+        }
+    } else if (xQueueReceive(button_event_queue, &event, 0) == pdTRUE) {
+        result = true;
     }
 
 done:
@@ -357,6 +383,7 @@ void MeshRoom::gotRouting(const meshtastic_MeshPacket &packet,
         (packet.from != packet.to)) {
         consoles_printf("traceroute from %s -> %s[%.2fdB]\n",
                         getDisplayName(packet.from).c_str(),
+                        getDisplayName(packet.to).c_str(),
                         packet.rx_snr);
     }
 }
@@ -511,12 +538,15 @@ bool MeshRoom::loadNvm(void)
 {
     bool result = false;
     size_t size = 0;
+    size_t max_payload = 0;
     const struct nvm_header *header = NULL;
     const struct nvm_main_body *main_body = NULL;
     const struct nvm_authchan_entry *authchans = NULL;
     const struct nvm_admin_entry *admins = NULL;
     const struct nvm_mate_entry *mates = NULL;
     const struct nvm_footer *footer = NULL;
+    uint32_t n_authchans, n_admins, n_mates;
+    uint32_t crc;
     unsigned int i;
 
     header = (const struct nvm_header *) (XIP_BASE + FLASH_TARGET_OFFSET);
@@ -528,45 +558,74 @@ bool MeshRoom::loadNvm(void)
 
     main_body = (const struct nvm_main_body *)
         (((const uint8_t *) header) + sizeof(*header));
-    size =
-        sizeof(struct nvm_header) +
-        sizeof(struct nvm_main_body) +
-        (main_body->n_authchans * sizeof(struct nvm_authchan_entry)) +
-        (main_body->n_admins * sizeof(struct nvm_admin_entry)) +
-        (main_body->n_mates * sizeof(struct nvm_mate_entry)) +
+    n_authchans = main_body->n_authchans;
+    n_admins = main_body->n_admins;
+    n_mates = main_body->n_mates;
+
+    size = sizeof(struct nvm_header) + sizeof(struct nvm_main_body) +
         sizeof(struct nvm_footer);
     if (size > FLASH_TARGET_SIZE) {
         consoles_printf("Too big size=%zu!\n", size);
         result = false;
         goto done;
     }
+    max_payload = FLASH_TARGET_SIZE - size;
+    if (n_authchans > (max_payload / sizeof(struct nvm_authchan_entry))) {
+        consoles_printf("Too many authchans=%lu!\n",
+                        (unsigned long) n_authchans);
+        result = false;
+        goto done;
+    }
+    size += n_authchans * sizeof(struct nvm_authchan_entry);
+    max_payload = FLASH_TARGET_SIZE - size;
+    if (n_admins > (max_payload / sizeof(struct nvm_admin_entry))) {
+        consoles_printf("Too many admins=%lu!\n", (unsigned long) n_admins);
+        result = false;
+        goto done;
+    }
+    size += n_admins * sizeof(struct nvm_admin_entry);
+    max_payload = FLASH_TARGET_SIZE - size;
+    if (n_mates > (max_payload / sizeof(struct nvm_mate_entry))) {
+        consoles_printf("Too many mates=%lu!\n", (unsigned long) n_mates);
+        result = false;
+        goto done;
+    }
+    size += n_mates * sizeof(struct nvm_mate_entry);
+
     authchans = (const struct nvm_authchan_entry *)
         (((uint8_t *) main_body) + sizeof(*main_body));
     admins = (const struct nvm_admin_entry *)
         (((uint8_t *) authchans) +
-         (sizeof(struct nvm_authchan_entry) * main_body->n_authchans));
+         (sizeof(struct nvm_authchan_entry) * n_authchans));
     mates = (const struct nvm_mate_entry *)
         (((uint8_t *) admins) +
-         (sizeof(struct nvm_admin_entry) * main_body->n_admins));
+         (sizeof(struct nvm_admin_entry) * n_admins));
     footer = (const struct nvm_footer *)
         (((uint8_t *) mates) +
-         (sizeof(struct nvm_mate_entry) * main_body->n_mates));
+         (sizeof(struct nvm_mate_entry) * n_mates));
     if (footer->magic != NVM_FOOTER_MAGIC) {
         consoles_printf("Wrong footer magic!\n");
         result = false;
         goto done;
     }
+    crc = crc32_le((const uint8_t *) header,
+                   size - sizeof(footer->crc32));
+    if ((footer->crc32 != 0) && (footer->crc32 != crc)) {
+        consoles_printf("Bad nvm crc32!\n");
+        result = false;
+        goto done;
+    }
     memcpy(&_main_body, main_body, sizeof(struct nvm_main_body));
     _nvm_authchans.clear();
-    for (i = 0; i < main_body->n_authchans; i++) {
+    for (i = 0; i < n_authchans; i++) {
         _nvm_authchans.push_back(authchans[i]);
     }
     _nvm_admins.clear();
-    for (i = 0; i < main_body->n_admins; i++) {
+    for (i = 0; i < n_admins; i++) {
         _nvm_admins.push_back(admins[i]);
     }
     _nvm_mates.clear();
-    for (i = 0; i < main_body->n_mates; i++) {
+    for (i = 0; i < n_mates; i++) {
         _nvm_mates.push_back(mates[i]);
     }
 
@@ -595,6 +654,7 @@ bool MeshRoom::saveNvm(void)
     bool result = false;
     uint8_t *buf = NULL;
     size_t size = 0;
+    size_t prog_size = 0;
     struct nvm_header *header = NULL;
     struct nvm_main_body *main_body = NULL;
     struct nvm_authchan_entry *authchans = NULL;
@@ -603,6 +663,7 @@ bool MeshRoom::saveNvm(void)
     struct nvm_footer *footer = NULL;
     unsigned int i;
     struct nvm_write_params params;
+    int rc;
 
     _main_body.n_authchans = nvmAuthchans().size();
     _main_body.n_admins = nvmAdmins().size();
@@ -616,12 +677,24 @@ bool MeshRoom::saveNvm(void)
         (sizeof(struct nvm_mate_entry) * _main_body.n_mates) +
         sizeof(struct nvm_footer);
 
-    buf = (uint8_t *) pvPortMalloc(size);
+    if (size > FLASH_TARGET_SIZE) {
+        result = false;
+        goto done;
+    }
+
+    prog_size = (size + FLASH_PAGE_SIZE - 1) & ~(FLASH_PAGE_SIZE - 1);
+    if (prog_size > FLASH_TARGET_SIZE) {
+        result = false;
+        goto done;
+    }
+
+    buf = (uint8_t *) pvPortMalloc(prog_size);
     if (buf == NULL) {
         result = false;
         goto done;
     }
 
+    memset(buf, 0xff, prog_size);
     memset(buf, 0x0, size);
 
     header = (struct nvm_header *) buf;
@@ -653,13 +726,17 @@ bool MeshRoom::saveNvm(void)
         (((uint8_t *) mates) +
          (sizeof(struct nvm_mate_entry) * _main_body.n_mates));
     footer->magic = NVM_FOOTER_MAGIC;
-    footer->crc32 = 0;
+    footer->crc32 = crc32_le(buf, size - sizeof(footer->crc32));
 
     params.buf = buf;
-    params.size = size;
+    params.size = prog_size;
     flash_safe_execute_core_init();
-    flash_safe_execute(write_to_nvm, &params, 1000);
+    rc = flash_safe_execute(write_to_nvm, &params, 1000);
     flash_safe_execute_core_deinit();
+    if (rc != PICO_OK) {
+        result = false;
+        goto done;
+    }
 
     result = true;
 

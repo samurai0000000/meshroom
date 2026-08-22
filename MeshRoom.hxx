@@ -9,7 +9,6 @@
 
 #include <FreeRTOS.h>
 #include <semphr.h>
-#include <vector>
 #include <SimpleClient.hxx>
 #include <HomeChat.hxx>
 #include <BaseNvm.hxx>
@@ -165,7 +164,6 @@ private:
 
     struct nvm_main_body _main_body;
 
-    vector<struct button_event> _buttonEvents;
     bool _tvOnOff;
     unsigned int _tvVol;
     unsigned int _tvChan;

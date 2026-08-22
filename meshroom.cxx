@@ -5,6 +5,7 @@
  */
 
 #include <time.h>
+#include <stdarg.h>
 #include <pico/stdlib.h>
 #include <pico/time.h>
 #include <pico/cyw43_arch.h>
@@ -213,9 +214,12 @@ int consoles_printf(const char *format, ...)
 int consoles_vprintf(const char *format, va_list ap)
 {
     int ret = 0;
+    va_list ap_uart;
 
+    va_copy(ap_uart, ap);
     ret = usbcdc_vprintf(format, ap);
-    ret = serial0_vprintf(format, ap);
+    serial0_vprintf(format, ap_uart);
+    va_end(ap_uart);
 
     return ret;
 }

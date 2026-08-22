@@ -11,6 +11,7 @@
 #include <hardware/sync.h>
 #include <hardware/watchdog.h>
 #include <hardware/clocks.h>
+#include <hardware/uart.h>
 #include <pico/bootrom.h>
 #include <FreeRTOS.h>
 #include <task.h>
@@ -21,6 +22,11 @@
 #include <MeshRoomShell.hxx>
 
 extern shared_ptr<MeshRoom> meshroom;
+
+static void flush_serial_console(void)
+{
+    uart_tx_wait_blocking(uart0);
+}
 
 MeshRoomShell::MeshRoomShell(shared_ptr<SimpleClient> client)
     : SimpleShell(client)
@@ -147,15 +153,8 @@ int MeshRoomShell::reboot(int argc, char **argv)
     this->printf("Disconnect from meshtastic\n");
     meshroom->sendDisconnect();
     this->printf("Rebooting ...\n");
+    flush_serial_console();
     PicoPlatform::get()->reboot();
-
-    return 0;
-}
-
-int MeshRoomShell::nvm(int argc, char **argv)
-{
-    ir(argc, argv);
-    SimpleShell::nvm(argc, argv);
 
     return 0;
 }
@@ -167,6 +166,7 @@ int MeshRoomShell::bootsel(int argc, char **argv)
 
     meshroom->sendDisconnect();
     this->printf("Rebooting to BOOTSEL mode ...\n");
+    flush_serial_console();
     PicoPlatform::get()->bootsel();
 
     return 0;
