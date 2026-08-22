@@ -21,6 +21,8 @@
 #include <semphr.h>
 #include <memory>
 #include <libmeshtastic.h>
+#include <pico-plat.h>
+#include <PicoPlatform.hxx>
 #include <MeshRoom.hxx>
 #include <MeshRoomShell.hxx>
 #include <meshroom.h>
@@ -36,9 +38,9 @@
 #define MORSEBUZZER_TASK_PRIORITY      29
 #define MESHTASTIC_TASK_STACK_SIZE     4096
 #define MESHTASTIC_TASK_PRIORITY       15
-#define SHELL0_TASK_STACK_SIZE         2048
+#define SHELL0_TASK_STACK_SIZE         4096
 #define SHELL0_TASK_PRIORITY           10
-#define SHELL1_TASK_STACK_SIZE         2048
+#define SHELL1_TASK_STACK_SIZE         4096
 #define SHELL1_TASK_PRIORITY           10
 
 shared_ptr<MeshRoom> meshroom = NULL;
@@ -81,7 +83,7 @@ static void usb_task(__unused void *params)
 {
     for (;;) {
         usbcdc_task();
-        taskYIELD();
+        vTaskDelay(1);
     }
 }
 
@@ -256,7 +258,7 @@ int main(void)
     }
     usbcdc_init();
     serial_init();
-    cyw43_arch_init();
+    PicoPlatform::initWireless();
 
     meshroom = make_shared<MeshRoom>();
     meshroom->setBanner(banner);
