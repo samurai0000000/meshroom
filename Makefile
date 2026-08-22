@@ -23,7 +23,18 @@ distclean:
 
 meshroom: build/meshroom.uf2
 
+MESHROOM_TREE :=	\
+	CMakeLists.txt version.h.in \
+	$(wildcard *.cxx) $(wildcard *.hxx) $(wildcard *.h) \
+	libmeshtastic pico-plat
+
 build/meshroom.uf2: build/Makefile
+	@if [ -f $@ ] && [ -n "`find -H $(MESHROOM_TREE) -type f \
+	    \( -name '*.c' -o -name '*.cxx' -o -name '*.h' -o -name '*.hxx' \
+	       -o -name 'CMakeLists.txt' -o -name 'version.h.in' \) \
+	    -newer $@ -print -quit`" ]; then \
+		rm -f build/version.h; \
+	fi
 	@$(MAKE) -C build
 
 build/Makefile: CMakeLists.txt
@@ -46,7 +57,7 @@ openocd:
 .PHONY: openocd-reset
 
 openocd-reset:
-	@openocd -f /usr/share/openocd/scripts/interface/cmsis-dap.cfg -f /usr/share/openocd/scripts/target/rp2040.cfg -c "init; reset; exit"
+	@openocd -f /usr/share/openocd/scripts/interface/cmsis-dap.cfg -f /usr/share/openocd/scripts/target/rp2040.cfg -c "adapter speed 5000; init; halt; reset; exit"
 
 .PHONY: gdb
 
