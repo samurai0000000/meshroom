@@ -8,7 +8,6 @@
 #include <stdarg.h>
 #include <pico/stdlib.h>
 #include <pico/time.h>
-#include <pico/cyw43_arch.h>
 #include <hardware/uart.h>
 #include <hardware/sync.h>
 #include <hardware/watchdog.h>
@@ -35,9 +34,9 @@
 #define USB_TASK_STACK_SIZE            2048
 #define USB_TASK_PRIORITY              20
 #define MORSEBUZZER_TASK_STACK_SIZE    1024
-#define MORSEBUZZER_TASK_PRIORITY      29
+#define MORSEBUZZER_TASK_PRIORITY      12
 #define MESHTASTIC_TASK_STACK_SIZE     4096
-#define MESHTASTIC_TASK_PRIORITY       15
+#define MESHTASTIC_TASK_PRIORITY       8
 #define SHELL0_TASK_STACK_SIZE         4096
 #define SHELL0_TASK_PRIORITY           10
 #define SHELL1_TASK_STACK_SIZE         4096
@@ -202,10 +201,8 @@ int consoles_printf(const char *format, ...)
     int ret = 0;
     va_list ap;
 
-    va_start(ap, format);
-    ret = usbcdc_vprintf(format, ap);
-    va_end(ap);
-
+    /* picows only writes CDC from the USB shell. usbcdc_write waits forever
+     * while DTR is set if the host is not draining IN; UART TX does not. */
     va_start(ap, format);
     ret = serial0_vprintf(format, ap);
     va_end(ap);
@@ -215,15 +212,7 @@ int consoles_printf(const char *format, ...)
 
 int consoles_vprintf(const char *format, va_list ap)
 {
-    int ret = 0;
-    va_list ap_uart;
-
-    va_copy(ap_uart, ap);
-    ret = usbcdc_vprintf(format, ap);
-    serial0_vprintf(format, ap_uart);
-    va_end(ap_uart);
-
-    return ret;
+    return serial0_vprintf(format, ap);
 }
 
 void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
@@ -329,6 +318,8 @@ int main(void)
                 &shell1Task);
 
 #if defined(configUSE_CORE_AFFINITY) && (configNUMBER_OF_CORES > 1)
+    /* picows: USB/watchdog/LED on core 0, shells on core 1. Meshtastic stays
+     * on the shell core but below them so it cannot starve CDC or UART. */
     vTaskCoreAffinitySet(watchdogTask, 0x1);
     vTaskCoreAffinitySet(ledTask, 0x1);
     vTaskCoreAffinitySet(usbTask, 0x1);

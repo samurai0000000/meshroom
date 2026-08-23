@@ -16,21 +16,17 @@ add_subdirectory(pico-plat)
 add_subdirectory(libmeshtastic)
 
 include_directories(${CMAKE_CURRENT_LIST_DIR})
-add_compile_options(-Wall -Wextra -Werror)
+add_compile_options(-Wall -Wextra -Werror
+  -Wno-unused-variable
+  -Wno-unused-but-set-variable
+  -Wno-unused-parameter
+  -Wno-psabi)
 add_compile_options(-g -O2)
 
 set(PICO_CXX_ENABLE_EXCEPTIONS 1)
 set(PICO_USE_STACK_GUARDS 1)
 
 pico_sdk_init()
-
-include_directories(${CMAKE_CURRENT_LIST_DIR})
-add_compile_options(-Wall -Wextra -Werror
-  -Wno-unused-variable
-  -Wno-unused-but-set-variable
-  -Wno-unused-parameter
-  -Wno-psabi)
-add_compile_options(-g -Os)
 
 set(WHOAMI_OUTPUT)
 execute_process(
