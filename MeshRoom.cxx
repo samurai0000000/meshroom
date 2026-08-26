@@ -10,6 +10,7 @@
 #include <pico/flash.h>
 #include <hardware/flash.h>
 #include <hardware/sync.h>
+#include <hardware/watchdog.h>
 #include <FreeRTOS.h>
 #include <task.h>
 #include <queue.h>
@@ -45,6 +46,7 @@ MeshRoom::MeshRoom()
     _main_body.ir_flags =
         MESHROOM_IR_SONY_BRAVIA |
         MESHROOM_IR_PANASONIC_AC;
+    _watchdogEnabled = true;
     _tvOnOff = false;
     _tvVol = 10;
     _tvChan = 1;
@@ -350,6 +352,21 @@ void MeshRoom::flipOnboardLed(void)
 float MeshRoom::getOnboardTempC(void) const
 {
     return PicoPlatform::get()->getOnboardTempC();
+}
+
+bool MeshRoom::isWatchdogEnabled(void) const
+{
+    return _watchdogEnabled;
+}
+
+void MeshRoom::setWatchdogEnabled(bool enable)
+{
+    _watchdogEnabled = enable;
+    if (enable) {
+        watchdog_enable(5000, true);
+    } else {
+        watchdog_disable();
+    }
 }
 
 void MeshRoom::gotTextMessage(const meshtastic_MeshPacket &packet,

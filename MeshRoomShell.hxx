@@ -34,6 +34,7 @@ protected:
     virtual int buzz(int argc, char **argv);
     virtual int morse(int argc, char **argv);
     virtual int reset(int argc, char **argv);
+    virtual int watchdog(int argc, char **argv);
     virtual int unknown_command(int argc, char **argv);
 
 };

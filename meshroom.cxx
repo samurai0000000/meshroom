@@ -60,7 +60,9 @@ static void watchdog_task(__unused void *params)
     watchdog_enable_caused_reboot();
 
     for (;;) {
-        watchdog_update();
+        if (meshroom->isWatchdogEnabled()) {
+            watchdog_update();
+        }
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }

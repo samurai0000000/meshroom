@@ -108,6 +108,9 @@ public:
 
     float getOnboardTempC(void) const;
 
+    bool isWatchdogEnabled(void) const;
+    void setWatchdogEnabled(bool enable);
+
 protected:
 
     // Extend SimpleClient
@@ -175,6 +178,7 @@ private:
     unsigned int _resetCount;
     time_t _lastReset;
     bool _alertLed;
+    bool _watchdogEnabled;
 
 };
 

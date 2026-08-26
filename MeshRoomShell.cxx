@@ -38,6 +38,7 @@ MeshRoomShell::MeshRoomShell(shared_ptr<SimpleClient> client)
     _help_list.push_back("buzz");
     _help_list.push_back("morse");
     _help_list.push_back("reset");
+    _help_list.push_back("watchdog");
 }
 
 MeshRoomShell::~MeshRoomShell()
@@ -465,6 +466,35 @@ int MeshRoomShell::reset(int argc, char **argv)
     return ret;
 }
 
+int MeshRoomShell::watchdog(int argc, char **argv)
+{
+    int ret = 0;
+
+    if (argc == 1) {
+        this->printf("watchdog: %s\n", meshroom->isWatchdogEnabled() ? "enabled" : "disabled");
+        if (meshroom->isWatchdogEnabled()) {
+            this->printf("time remaining: %lu ms\n", watchdog_get_time_remaining_ms());
+        }
+        this->printf("last reboot caused by watchdog: %s\n",
+                     watchdog_caused_reboot() ? "yes" : "no");
+        if (watchdog_caused_reboot()) {
+            this->printf("watchdog enable caused reboot: %s\n",
+                         watchdog_enable_caused_reboot() ? "yes" : "no");
+        }
+    } else if ((argc == 2) && (strcmp(argv[1], "enable") == 0)) {
+        meshroom->setWatchdogEnabled(true);
+        this->printf("ok\n");
+    } else if ((argc == 2) && (strcmp(argv[1], "disable") == 0)) {
+        meshroom->setWatchdogEnabled(false);
+        this->printf("ok\n");
+    } else {
+        this->printf("syntax error!\n");
+        ret = -1;
+    }
+
+    return ret;
+}
+
 int MeshRoomShell::unknown_command(int argc, char **argv)
 {
     int ret = 0;
@@ -483,6 +513,8 @@ int MeshRoomShell::unknown_command(int argc, char **argv)
         ret = this->morse(argc, argv);
     } else if (strcmp(argv[0], "reset") == 0) {
         ret = this->reset(argc, argv);
+    } else if (strcmp(argv[0], "watchdog") == 0) {
+        ret = this->watchdog(argc, argv);
     } else {
         this->printf("Unknown command '%s'!\n", argv[0]);
         ret = -1;
