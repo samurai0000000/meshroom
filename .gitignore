@@ -1,2 +1,4 @@
 build/
-.cursor/
+.cursor
+.agent
+.agents
