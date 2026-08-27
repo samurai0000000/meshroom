@@ -72,12 +72,19 @@ public:
     unsigned int tvVol(void) const;
     void tvChan(unsigned int chan);
     unsigned int tvChan(void) const;
+    void tvMute(bool mute);
+    bool tvMute(void) const;
+    void toggleTvMute(void);
+    void tvInput(void);
+    void tvDigit(unsigned int digit);
+    string tvIrProtocolStr(void) const;
 
     enum AcMode {
         AC_AC,
         AC_HEATER,
         AC_DEHUMIDIFIER,
         AC_AUTO,
+        AC_FAN,
     };
 
     bool getButtonEvent(struct button_event &event, bool clearOld = false);
@@ -91,8 +98,18 @@ public:
     unsigned int acTemp(void) const;
     void acFanSpeed(unsigned int speed);
     unsigned int acFanSpeed(void) const;
+    string acFanSpeedStr(void) const;
     void acFanDir(unsigned int dir);
     unsigned int acFanDir(void) const;
+    string acFanDirStr(void) const;
+    void acPowerful(bool powerful);
+    bool acPowerful(void) const;
+    void acQuiet(bool quiet);
+    bool acQuiet(void) const;
+    string acIrProtocolStr(void) const;
+
+    void blastTvCommand(enum TvCommand cmd);
+    void blastAcState(void);
 
     void reset(void);
     unsigned int getResetCount(void) const;
@@ -130,7 +147,8 @@ protected:
 
     // Extend HomeChat
 
-    virtual string handleUnknown(uint32_t node_num, string &message);
+    virtual string handleUnknown(uint32_t node_num, uint32_t dest,
+                                 uint8_t channel, string &message);
     virtual string handleEnv(uint32_t node_num, string &message);
     virtual string handleStatus(uint32_t node_num, string &message);
     virtual string handleTv(uint32_t node_num, string &message);
@@ -169,19 +187,19 @@ private:
 
     struct nvm_main_body _main_body;
 
-    void blastTvCommand(enum TvCommand cmd);
-    void blastAcState(void);
-
     IrTransmitter _irTx;
 
     bool _tvOnOff;
     unsigned int _tvVol;
     unsigned int _tvChan;
+    bool _tvMute;
     bool _acOnOff;
     AcMode _acMode;
     unsigned int _acTemp;
     unsigned int _acFanSpeed;
     unsigned int _acFanDir;
+    bool _acPowerful;
+    bool _acQuiet;
     unsigned int _resetCount;
     time_t _lastReset;
     bool _alertLed;

@@ -284,77 +284,111 @@ int MeshRoomShell::tv(int argc, char **argv)
     if ((argc >= 2) &&
         ((strcmp(argv[1], "-h") == 0) || (strcmp(argv[1], "--help") == 0))) {
         this->printf("Usage: %s [-h|--help] [command] [args...]\n", argv[0]);
-        this->printf("  Control TV power, volume, and channel via IR.\n");
+        this->printf("  Control TV power, volume, channel, mute, and input via IR.\n");
         this->printf("Commands:\n");
-        this->printf("  tv                           Display TV power, volume, and channel status\n");
+        this->printf("  tv                           Display TV power, volume, channel, mute, and protocol\n");
         this->printf("  tv on                        Turn TV power on\n");
         this->printf("  tv off                       Turn TV power off\n");
-        this->printf("  tv vol up|down|<value>       Increase, decrease, or set volume level\n");
-        this->printf("  tv chan up|down|<value>      Increase, decrease, or set channel number\n");
+        this->printf("  tv toggle                    Toggle TV power\n");
+        this->printf("  tv vol [up|down|<0-100>]     Increase, decrease, or set volume level\n");
+        this->printf("  tv chan [up|down|<1-999>]    Increase, decrease, or set channel number\n");
+        this->printf("  tv mute [on|off|toggle]      Mute, unmute, or toggle TV audio\n");
+        this->printf("  tv input                     Cycle TV video input source\n");
+        this->printf("  tv key <0-9>                 Send direct remote numeric key\n");
         return 0;
     }
 
     if (argc == 1) {
         this->printf("tv: %s\n", meshroom->tvOnOff() ? "on" : "off");
-        if (meshroom->tvOnOff()) {
-            this->printf("vol: %u\n", meshroom->tvVol());
-            this->printf("chan: %u\n", meshroom->tvChan());
-        }
+        this->printf("vol: %u\n", meshroom->tvVol());
+        this->printf("chan: %u\n", meshroom->tvChan());
+        this->printf("mute: %s\n", meshroom->tvMute() ? "on" : "off");
+        this->printf("ir: %s\n", meshroom->tvIrProtocolStr().c_str());
     } else if ((argc == 2) && (strcmp(argv[1], "on") == 0)) {
         meshroom->tvOnOff(true);
         this->printf("turn tv on\n");
     } else if ((argc == 2) && (strcmp(argv[1], "off") == 0)) {
         meshroom->tvOnOff(false);
         this->printf("turn tv off\n");
-    } else if ((argc == 3) && (strcmp(argv[1], "vol") == 0) &&
-               (strcmp(argv[2], "up") == 0)) {
-        meshroom->tvVol(meshroom->tvVol() + 1);
-        this->printf("set tv vol to %u\n", meshroom->tvVol());
-    } else if ((argc == 3) && (strcmp(argv[1], "vol") == 0) &&
-               (strcmp(argv[2], "down") == 0)) {
-        meshroom->tvVol(meshroom->tvVol() - 1);
-        this->printf("set tv vol to %u\n", meshroom->tvVol());
-    } else if ((argc == 3) && (strcmp(argv[1], "vol") == 0)) {
-        unsigned int vol = 0;
-
-        try {
-            vol = stoi(argv[2]);
-        } catch (const invalid_argument &e) {
-            this->printf("invalid volume argument!\n");
+    } else if ((argc == 2) && (strcmp(argv[1], "toggle") == 0)) {
+        meshroom->tvOnOff(!meshroom->tvOnOff());
+        this->printf("toggle tv %s\n", meshroom->tvOnOff() ? "on" : "off");
+    } else if ((argc >= 2) && (strcmp(argv[1], "mute") == 0)) {
+        if (argc == 2 || strcmp(argv[2], "toggle") == 0) {
+            meshroom->toggleTvMute();
+        } else if (strcmp(argv[2], "on") == 0) {
+            meshroom->tvMute(true);
+        } else if (strcmp(argv[2], "off") == 0) {
+            meshroom->tvMute(false);
+        } else {
+            this->printf("invalid mute argument!\n");
             ret = -1;
             goto done;
         }
-
-        meshroom->tvVol(vol);
-        this->printf("set tv vol to %u\n", meshroom->tvVol());
-    } else if ((argc == 3) && (strcmp(argv[1], "chan") == 0) &&
-               (strcmp(argv[2], "up") == 0)) {
-        meshroom->tvChan(meshroom->tvChan() + 1);
-        this->printf("set tv chan to %u\n", meshroom->tvChan());
-    } else if ((argc == 3) && (strcmp(argv[1], "chan") == 0) &&
-               (strcmp(argv[2], "down") == 0)) {
-        meshroom->tvChan(meshroom->tvChan() - 1);
-        this->printf("set tv chan to %u\n", meshroom->tvChan());
-    } else if ((argc == 3) && (strcmp(argv[1], "chan") == 0)) {
-        unsigned int chan = 0;
-
-        try {
-            chan = stoi(argv[2]);
-        } catch (const invalid_argument &e) {
-            this->printf("invalid channel argument!\n");
+        this->printf("tv mute %s\n", meshroom->tvMute() ? "on" : "off");
+    } else if ((argc == 2) && ((strcmp(argv[1], "input") == 0) || (strcmp(argv[1], "source") == 0))) {
+        meshroom->tvInput();
+        this->printf("tv input switch\n");
+    } else if ((argc == 3) && (strcmp(argv[1], "key") == 0)) {
+        char *endptr = NULL;
+        unsigned long key = strtoul(argv[2], &endptr, 10);
+        if (*endptr != '\0' || key > 9) {
+            this->printf("invalid key argument (must be 0-9)!\n");
             ret = -1;
             goto done;
         }
-
-        meshroom->tvChan(chan);
-        this->printf("set tv chan to %u\n", meshroom->tvChan());
+        meshroom->tvDigit((unsigned int) key);
+        this->printf("sent tv key %lu\n", key);
+    } else if ((argc == 2) && (strlen(argv[1]) == 1) && isdigit((unsigned char)argv[1][0])) {
+        unsigned int key = (unsigned int)(argv[1][0] - '0');
+        meshroom->tvDigit(key);
+        this->printf("sent tv key %u\n", key);
+    } else if ((argc >= 2) && (strcmp(argv[1], "vol") == 0)) {
+        if (argc == 2) {
+            this->printf("vol: %u\n", meshroom->tvVol());
+        } else if (strcmp(argv[2], "up") == 0) {
+            meshroom->tvVol(meshroom->tvVol() + 1);
+            this->printf("set tv vol to %u\n", meshroom->tvVol());
+        } else if (strcmp(argv[2], "down") == 0) {
+            meshroom->tvVol(meshroom->tvVol() > 0 ? meshroom->tvVol() - 1 : 0);
+            this->printf("set tv vol to %u\n", meshroom->tvVol());
+        } else {
+            char *endptr = NULL;
+            unsigned long vol = strtoul(argv[2], &endptr, 10);
+            if (*endptr != '\0' || vol > 100) {
+                this->printf("invalid volume argument (0-100)!\n");
+                ret = -1;
+                goto done;
+            }
+            meshroom->tvVol((unsigned int) vol);
+            this->printf("set tv vol to %u\n", meshroom->tvVol());
+        }
+    } else if ((argc >= 2) && (strcmp(argv[1], "chan") == 0)) {
+        if (argc == 2) {
+            this->printf("chan: %u\n", meshroom->tvChan());
+        } else if (strcmp(argv[2], "up") == 0) {
+            meshroom->tvChan(meshroom->tvChan() + 1);
+            this->printf("set tv chan to %u\n", meshroom->tvChan());
+        } else if (strcmp(argv[2], "down") == 0) {
+            meshroom->tvChan(meshroom->tvChan() > 1 ? meshroom->tvChan() - 1 : 1);
+            this->printf("set tv chan to %u\n", meshroom->tvChan());
+        } else {
+            char *endptr = NULL;
+            unsigned long chan = strtoul(argv[2], &endptr, 10);
+            if (*endptr != '\0' || chan < 1 || chan > 999) {
+                this->printf("invalid channel argument (1-999)!\n");
+                ret = -1;
+                goto done;
+            }
+            meshroom->tvChan((unsigned int) chan);
+            this->printf("set tv chan to %u\n", meshroom->tvChan());
+        }
     } else {
         this->printf("syntax error!\n");
         ret = -1;
     }
 
 done:
-
     return ret;
 }
 
@@ -365,114 +399,218 @@ int MeshRoomShell::ac(int argc, char **argv)
     if ((argc >= 2) &&
         ((strcmp(argv[1], "-h") == 0) || (strcmp(argv[1], "--help") == 0))) {
         this->printf("Usage: %s [-h|--help] [command] [args...]\n", argv[0]);
-        this->printf("  Control Air Conditioner power, mode, temp, and fan via IR.\n");
+        this->printf("  Control Air Conditioner power, mode, temp, fan, and swing via IR.\n");
         this->printf("Commands:\n");
-        this->printf("  ac                           Display AC power, mode, temp, fanspeed, and fandir\n");
-        this->printf("  ac on                        Turn AC power on\n");
-        this->printf("  ac off                       Turn AC power off\n");
-        this->printf("  ac mode <ac|heater|dehumifier|auto>  Set operating mode\n");
-        this->printf("  ac temp up|down|<value>      Increase, decrease, or set target temperature (C)\n");
-        this->printf("  ac fanspeed up|down|<value>  Increase, decrease, or set fan speed\n");
-        this->printf("  ac fandir up|down|<value>    Increase, decrease, or set fan direction\n");
+        this->printf("  ac                                   Display full AC state and parameters\n");
+        this->printf("  ac on|off                            Turn AC power on or off\n");
+        this->printf("  ac mode <cool|heat|dry|auto|fan>     Set operating mode\n");
+        this->printf("  ac temp [up|down|<16-30>]            Increase, decrease, or set temperature (C)\n");
+        this->printf("  ac fanspeed [auto|quiet|1-5|max]     Set fan speed level\n");
+        this->printf("  ac fandir [auto|up|mid|down|1-5]     Set vertical vane direction\n");
+        this->printf("  ac powerful [on|off|toggle]          Enable or disable powerful/turbo mode\n");
+        this->printf("  ac quiet [on|off|toggle]             Enable or disable quiet mode\n");
+        this->printf("  ac tx                                Re-transmit current AC state packet via IR\n");
+        this->printf("  ac set <on|off> <16-30> <mode> <fan> Set multiple parameters in one blast\n");
         return 0;
     }
 
     if (argc == 1) {
         this->printf("ac: %s\n", meshroom->acOnOff() ? "on" : "off");
         this->printf("mode: %s\n", meshroom->acModeStr().c_str());
-        if (meshroom->acOnOff()) {
-            this->printf("temp: %u\n", meshroom->acTemp());
-            this->printf("fanspeed: %u\n", meshroom->acFanSpeed());
-            this->printf("fandir: %u\n", meshroom->acFanDir());
-        }
+        this->printf("temp: %u C\n", meshroom->acTemp());
+        this->printf("fanspeed: %s\n", meshroom->acFanSpeedStr().c_str());
+        this->printf("fandir: %s\n", meshroom->acFanDirStr().c_str());
+        this->printf("powerful: %s\n", meshroom->acPowerful() ? "on" : "off");
+        this->printf("quiet: %s\n", meshroom->acQuiet() ? "on" : "off");
+        this->printf("ir: %s\n", meshroom->acIrProtocolStr().c_str());
+    } else if ((argc == 2) && (strcmp(argv[1], "tx") == 0 || strcmp(argv[1], "blast") == 0)) {
+        meshroom->blastAcState();
+        this->printf("transmitted ac state via IR\n");
     } else if ((argc == 2) && (strcmp(argv[1], "on") == 0)) {
         meshroom->acOnOff(true);
         this->printf("turn ac on\n");
     } else if ((argc == 2) && (strcmp(argv[1], "off") == 0)) {
         meshroom->acOnOff(false);
         this->printf("turn ac off\n");
-    } else if ((argc == 3) && (strcmp(argv[1], "mode") == 0) &&
-               (strcmp(argv[2], "ac") == 0)) {
-        meshroom->acMode(MeshRoom::AC_AC);
-    } else if ((argc == 3) && (strcmp(argv[1], "mode") == 0) &&
-               (strcmp(argv[2], "heater") == 0)) {
-        meshroom->acMode(MeshRoom::AC_HEATER);
-    } else if ((argc == 3) && (strcmp(argv[1], "mode") == 0) &&
-               (strcmp(argv[2], "dehumifier") == 0)) {
-        meshroom->acMode(MeshRoom::AC_DEHUMIDIFIER);
-    } else if ((argc == 3) && (strcmp(argv[1], "mode") == 0) &&
-               (strcmp(argv[2], "auto") == 0)) {
-        meshroom->acMode(MeshRoom::AC_AUTO);
-    } else if ((argc == 3) && (strcmp(argv[1], "temp") == 0) &&
-               (strcmp(argv[2], "up") == 0)) {
-        meshroom->acTemp(meshroom->acTemp() + 1);
-        this->printf("set temp to %u\n", meshroom->acTemp());
-    } else if ((argc == 3) && (strcmp(argv[1], "temp") == 0) &&
-               (strcmp(argv[2], "down") == 0)) {
-        meshroom->acTemp(meshroom->acTemp() - 1);
-        this->printf("set temp to %u\n", meshroom->acTemp());
-    } else if ((argc == 3) && (strcmp(argv[1], "temp") == 0)) {
-        unsigned int temp = 0;
-
-        try {
-            temp = stoi(argv[2]);
-        } catch (const invalid_argument &e) {
-            this->printf("invalid temperature argument!\n");
+    } else if ((argc >= 2) && (strcmp(argv[1], "mode") == 0)) {
+        if (argc == 2) {
+            this->printf("mode: %s\n", meshroom->acModeStr().c_str());
+        } else if (strcmp(argv[2], "ac") == 0 || strcmp(argv[2], "cool") == 0) {
+            meshroom->acMode(MeshRoom::AC_AC);
+            this->printf("set mode to cool\n");
+        } else if (strcmp(argv[2], "heater") == 0 || strcmp(argv[2], "heat") == 0) {
+            meshroom->acMode(MeshRoom::AC_HEATER);
+            this->printf("set mode to heat\n");
+        } else if (strcmp(argv[2], "dehumifier") == 0 || strcmp(argv[2], "dehumidifier") == 0 || strcmp(argv[2], "dry") == 0) {
+            meshroom->acMode(MeshRoom::AC_DEHUMIDIFIER);
+            this->printf("set mode to dry\n");
+        } else if (strcmp(argv[2], "auto") == 0) {
+            meshroom->acMode(MeshRoom::AC_AUTO);
+            this->printf("set mode to auto\n");
+        } else if (strcmp(argv[2], "fan") == 0) {
+            meshroom->acMode(MeshRoom::AC_FAN);
+            this->printf("set mode to fan\n");
+        } else {
+            this->printf("invalid mode argument (cool, heat, dry, auto, fan)!\n");
             ret = -1;
             goto done;
         }
-
-        meshroom->acTemp(temp);
-        this->printf("set temp to %u\n", meshroom->acTemp());
-    } else if ((argc == 3) && (strcmp(argv[1], "fanspeed") == 0) &&
-               (strcmp(argv[2], "up") == 0)) {
-        meshroom->acFanSpeed(meshroom->acFanSpeed() + 1);
-        this->printf("set fanspeed to %u\n", meshroom->acFanSpeed());
-    } else if ((argc == 3) && (strcmp(argv[1], "fanspeed") == 0) &&
-               (strcmp(argv[2], "down") == 0)) {
-        meshroom->acFanSpeed(meshroom->acFanSpeed() - 1);
-        this->printf("set fanspeed to %u\n", meshroom->acFanSpeed());
-    } else if ((argc == 3) && (strcmp(argv[1], "fanspeed") == 0)) {
-        unsigned int fanspeed = 0;
-
-        try {
-            fanspeed = stoi(argv[2]);
-        } catch (const invalid_argument &e) {
-            this->printf("invalid fanspeed argument!\n");
+    } else if ((argc >= 2) && (strcmp(argv[1], "temp") == 0)) {
+        if (argc == 2) {
+            this->printf("temp: %u C\n", meshroom->acTemp());
+        } else if (strcmp(argv[2], "up") == 0) {
+            meshroom->acTemp(meshroom->acTemp() + 1);
+            this->printf("set temp to %u C\n", meshroom->acTemp());
+        } else if (strcmp(argv[2], "down") == 0) {
+            meshroom->acTemp(meshroom->acTemp() - 1);
+            this->printf("set temp to %u C\n", meshroom->acTemp());
+        } else {
+            char *endptr = NULL;
+            unsigned long temp = strtoul(argv[2], &endptr, 10);
+            if (*endptr != '\0' || temp < 16 || temp > 30) {
+                this->printf("invalid temperature argument (16-30)!\n");
+                ret = -1;
+                goto done;
+            }
+            meshroom->acTemp((unsigned int) temp);
+            this->printf("set temp to %u C\n", meshroom->acTemp());
+        }
+    } else if ((argc >= 2) && (strcmp(argv[1], "fanspeed") == 0 || strcmp(argv[1], "fan") == 0)) {
+        if (argc == 2) {
+            this->printf("fanspeed: %s\n", meshroom->acFanSpeedStr().c_str());
+        } else if (strcmp(argv[2], "up") == 0) {
+            meshroom->acFanSpeed(meshroom->acFanSpeed() + 1);
+            this->printf("set fanspeed to %s\n", meshroom->acFanSpeedStr().c_str());
+        } else if (strcmp(argv[2], "down") == 0) {
+            meshroom->acFanSpeed(meshroom->acFanSpeed() > 0 ? meshroom->acFanSpeed() - 1 : 0);
+            this->printf("set fanspeed to %s\n", meshroom->acFanSpeedStr().c_str());
+        } else if (strcmp(argv[2], "auto") == 0) {
+            meshroom->acFanSpeed(0);
+            this->printf("set fanspeed to auto\n");
+        } else if (strcmp(argv[2], "quiet") == 0 || strcmp(argv[2], "min") == 0) {
+            meshroom->acFanSpeed(1);
+            this->printf("set fanspeed to 1 (quiet)\n");
+        } else if (strcmp(argv[2], "low") == 0) {
+            meshroom->acFanSpeed(2);
+            this->printf("set fanspeed to 2 (low)\n");
+        } else if (strcmp(argv[2], "med") == 0 || strcmp(argv[2], "medium") == 0) {
+            meshroom->acFanSpeed(3);
+            this->printf("set fanspeed to 3 (med)\n");
+        } else if (strcmp(argv[2], "high") == 0) {
+            meshroom->acFanSpeed(4);
+            this->printf("set fanspeed to 4 (high)\n");
+        } else if (strcmp(argv[2], "max") == 0) {
+            meshroom->acFanSpeed(5);
+            this->printf("set fanspeed to 5 (max)\n");
+        } else {
+            char *endptr = NULL;
+            unsigned long speed = strtoul(argv[2], &endptr, 10);
+            if (*endptr != '\0' || speed > 5) {
+                this->printf("invalid fanspeed argument (0-5, auto, quiet, min, med, max)!\n");
+                ret = -1;
+                goto done;
+            }
+            meshroom->acFanSpeed((unsigned int) speed);
+            this->printf("set fanspeed to %s\n", meshroom->acFanSpeedStr().c_str());
+        }
+    } else if ((argc >= 2) && (strcmp(argv[1], "fandir") == 0 || strcmp(argv[1], "vane") == 0 || strcmp(argv[1], "swing") == 0)) {
+        if (argc == 2) {
+            this->printf("fandir: %s\n", meshroom->acFanDirStr().c_str());
+        } else if (strcmp(argv[2], "up") == 0) {
+            meshroom->acFanDir(1);
+            this->printf("set fandir to 1 (up)\n");
+        } else if (strcmp(argv[2], "up-mid") == 0 || strcmp(argv[2], "upmid") == 0) {
+            meshroom->acFanDir(2);
+            this->printf("set fandir to 2 (up-mid)\n");
+        } else if (strcmp(argv[2], "mid") == 0 || strcmp(argv[2], "middle") == 0) {
+            meshroom->acFanDir(3);
+            this->printf("set fandir to 3 (mid)\n");
+        } else if (strcmp(argv[2], "down-mid") == 0 || strcmp(argv[2], "downmid") == 0) {
+            meshroom->acFanDir(4);
+            this->printf("set fandir to 4 (down-mid)\n");
+        } else if (strcmp(argv[2], "down") == 0) {
+            meshroom->acFanDir(5);
+            this->printf("set fandir to 5 (down)\n");
+        } else if (strcmp(argv[2], "auto") == 0) {
+            meshroom->acFanDir(0);
+            this->printf("set fandir to auto\n");
+        } else {
+            char *endptr = NULL;
+            unsigned long dir = strtoul(argv[2], &endptr, 10);
+            if (*endptr != '\0' || dir > 5) {
+                this->printf("invalid fandir argument (0-5, auto, up, mid, down)!\n");
+                ret = -1;
+                goto done;
+            }
+            meshroom->acFanDir((unsigned int) dir);
+            this->printf("set fandir to %s\n", meshroom->acFanDirStr().c_str());
+        }
+    } else if ((argc >= 2) && (strcmp(argv[1], "powerful") == 0 || strcmp(argv[1], "turbo") == 0 || strcmp(argv[1], "boost") == 0)) {
+        if (argc == 2 || strcmp(argv[2], "toggle") == 0) {
+            meshroom->acPowerful(!meshroom->acPowerful());
+        } else if (strcmp(argv[2], "on") == 0) {
+            meshroom->acPowerful(true);
+        } else if (strcmp(argv[2], "off") == 0) {
+            meshroom->acPowerful(false);
+        } else {
+            this->printf("invalid powerful argument (on, off, toggle)!\n");
             ret = -1;
             goto done;
         }
-
-        meshroom->acFanSpeed(fanspeed);
-        this->printf("set fanspeed to %u\n", meshroom->acFanSpeed());
-    } else if ((argc == 3) && (strcmp(argv[1], "fandir") == 0) &&
-               (strcmp(argv[2], "up") == 0)) {
-        meshroom->acFanDir(meshroom->acFanDir() + 1);
-        this->printf("set fandir to %u\n", meshroom->acFanDir());
-    } else if ((argc == 3) && (strcmp(argv[1], "fandir") == 0) &&
-               (strcmp(argv[2], "down") == 0)) {
-        meshroom->acFanDir(meshroom->acFanDir() - 1);
-        this->printf("set fandir to %u\n", meshroom->acFanDir());
-    } else if ((argc == 3) && (strcmp(argv[1], "fandir") == 0)) {
-        unsigned int fandir = 0;
-
-        try {
-            fandir = stoi(argv[2]);
-        } catch (const invalid_argument &e) {
-            this->printf("invalid fandir argument!\n");
+        this->printf("ac powerful %s\n", meshroom->acPowerful() ? "on" : "off");
+    } else if ((argc >= 2) && (strcmp(argv[1], "quiet") == 0 || strcmp(argv[1], "silent") == 0)) {
+        if (argc == 2 || strcmp(argv[2], "toggle") == 0) {
+            meshroom->acQuiet(!meshroom->acQuiet());
+        } else if (strcmp(argv[2], "on") == 0) {
+            meshroom->acQuiet(true);
+        } else if (strcmp(argv[2], "off") == 0) {
+            meshroom->acQuiet(false);
+        } else {
+            this->printf("invalid quiet argument (on, off, toggle)!\n");
             ret = -1;
             goto done;
         }
-
-        meshroom->acFanDir(fandir);
-        this->printf("set fandir to %u\n", meshroom->acFanDir());
+        this->printf("ac quiet %s\n", meshroom->acQuiet() ? "on" : "off");
+    } else if ((argc >= 3) && (strcmp(argv[1], "set") == 0)) {
+        // Compound setter: ac set on 24 cool auto
+        for (int i = 2; i < argc; i++) {
+            if (strcmp(argv[i], "on") == 0) {
+                meshroom->acOnOff(true);
+            } else if (strcmp(argv[i], "off") == 0) {
+                meshroom->acOnOff(false);
+            } else if (strcmp(argv[i], "cool") == 0 || strcmp(argv[i], "ac") == 0) {
+                meshroom->acMode(MeshRoom::AC_AC);
+            } else if (strcmp(argv[i], "heat") == 0 || strcmp(argv[i], "heater") == 0) {
+                meshroom->acMode(MeshRoom::AC_HEATER);
+            } else if (strcmp(argv[i], "dry") == 0 || strcmp(argv[i], "dehumidifier") == 0) {
+                meshroom->acMode(MeshRoom::AC_DEHUMIDIFIER);
+            } else if (strcmp(argv[i], "fan") == 0) {
+                meshroom->acMode(MeshRoom::AC_FAN);
+            } else if (strcmp(argv[i], "auto") == 0) {
+                meshroom->acMode(MeshRoom::AC_AUTO);
+            } else {
+                char *endptr = NULL;
+                unsigned long val = strtoul(argv[i], &endptr, 10);
+                if (*endptr == '\0') {
+                    if (val >= 16 && val <= 30) {
+                        meshroom->acTemp((unsigned int)val);
+                    } else if (val <= 5) {
+                        meshroom->acFanSpeed((unsigned int)val);
+                    }
+                }
+            }
+        }
+        this->printf("ac: %s, mode: %s, temp: %u C, fan: %s\n",
+                     meshroom->acOnOff() ? "on" : "off",
+                     meshroom->acModeStr().c_str(),
+                     meshroom->acTemp(),
+                     meshroom->acFanSpeedStr().c_str());
     } else {
         this->printf("syntax error!\n");
         ret = -1;
     }
 
 done:
-
     return ret;
 }
 
