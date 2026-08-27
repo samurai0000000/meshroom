@@ -41,6 +41,7 @@ static uint32_t crc32_le(const uint8_t *data, size_t len)
 
 MeshRoom::MeshRoom()
     : SimpleClient(), HomeChat(), BaseNvm(), MorseBuzzer()
+    , _irTx(IR_BLAST_PIN)
 {
     bzero(&_main_body, sizeof(_main_body));
     _main_body.ir_flags =
@@ -81,9 +82,7 @@ MeshRoom::MeshRoom()
     gpio_set_dir(BUZZER_PIN, GPIO_OUT);
     gpio_put(BUZZER_PIN, false);
 
-    gpio_init(IR_BLAST_PIN);
-    gpio_set_dir(IR_BLAST_PIN, GPIO_OUT);
-    gpio_put(IR_BLAST_PIN, false);
+    _irTx.init();
 
     gpio_init(ALERT_LED_PIN);
     gpio_set_dir(ALERT_LED_PIN, GPIO_OUT);
@@ -161,9 +160,54 @@ done:
     return result;
 }
 
+void MeshRoom::blastTvCommand(enum TvCommand cmd)
+{
+    if (_main_body.ir_flags & MESHROOM_IR_SONY_BRAVIA) {
+        _irTx.sendSonyTv(cmd);
+    }
+    if (_main_body.ir_flags & MESHROOM_IR_SAMSUNG_TV) {
+        _irTx.sendSamsungTv(cmd);
+    }
+    if (_main_body.ir_flags & MESHROOM_IR_PANASONIC_TV) {
+        _irTx.sendPanasonicTv(cmd);
+    }
+}
+
+void MeshRoom::blastAcState(void)
+{
+    if (_main_body.ir_flags & MESHROOM_IR_PANASONIC_AC) {
+        struct IrHvacState state;
+        memset(&state, 0, sizeof(state));
+        state.power = _acOnOff;
+        switch (_acMode) {
+        case AC_AC:
+            state.mode = 1; // Cool
+            break;
+        case AC_HEATER:
+            state.mode = 3; // Heat
+            break;
+        case AC_DEHUMIDIFIER:
+            state.mode = 2; // Dry
+            break;
+        case AC_AUTO:
+        default:
+            state.mode = 0; // Auto
+            break;
+        }
+        state.targetTemp = (float)_acTemp;
+        state.fanSpeed = (uint8_t)_acFanSpeed;
+        state.swingV = (uint8_t)_acFanDir;
+        state.swingH = 0;
+        state.powerful = false;
+        state.quiet = false;
+        _irTx.sendPanasonicHvac(state);
+    }
+}
+
 void MeshRoom::tvOnOff(bool onOff)
 {
     _tvOnOff = onOff;
+    blastTvCommand(onOff ? TV_CMD_POWER_ON : TV_CMD_POWER_OFF);
 }
 
 bool MeshRoom::tvOnOff(void) const
@@ -177,6 +221,11 @@ void MeshRoom::tvVol(unsigned int volume)
         return;
     }
 
+    if (volume > _tvVol) {
+        blastTvCommand(TV_CMD_VOL_UP);
+    } else if (volume < _tvVol) {
+        blastTvCommand(TV_CMD_VOL_DOWN);
+    }
     _tvVol = volume;
 }
 
@@ -191,6 +240,11 @@ void MeshRoom::tvChan(unsigned int chan)
         return;
     }
 
+    if (chan > _tvChan) {
+        blastTvCommand(TV_CMD_CHAN_UP);
+    } else if (chan < _tvChan) {
+        blastTvCommand(TV_CMD_CHAN_DOWN);
+    }
     _tvChan = chan;
 }
 
@@ -202,6 +256,7 @@ unsigned int MeshRoom::tvChan(void) const
 void MeshRoom::acOnOff(bool onOff)
 {
     _acOnOff = onOff;
+    blastAcState();
 }
 
 bool MeshRoom::acOnOff(void) const
@@ -213,6 +268,7 @@ void MeshRoom::acMode(enum AcMode mode)
 {
     if ((mode >= AC_AC) && (mode <= AC_AUTO)) {
         _acMode = mode;
+        blastAcState();
     }
 }
 
@@ -247,8 +303,9 @@ string MeshRoom::acModeStr(void) const
 
 void MeshRoom::acTemp(unsigned int temp)
 {
-    if ((temp >= 20) && (temp <= 30)) {
+    if ((temp >= 16) && (temp <= 30)) {
         _acTemp = temp;
+        blastAcState();
     }
 }
 
@@ -261,6 +318,7 @@ void MeshRoom::acFanSpeed(unsigned int speed)
 {
     if (speed <= 5) {
         _acFanSpeed = speed;
+        blastAcState();
     }
 }
 
@@ -273,6 +331,7 @@ void MeshRoom::acFanDir(unsigned int dir)
 {
     if (dir <= 6) {
         _acFanDir = dir;
+        blastAcState();
     }
 }
 
@@ -491,9 +550,49 @@ string MeshRoom::handleEnv(uint32_t node_num, string &message)
 string MeshRoom::handleTv(uint32_t node_num, string &message)
 {
     string reply;
-
     (void)(node_num);
-    (void)(message);
+
+    stringstream ss(message);
+    string cmd, arg;
+    ss >> cmd >> arg;
+
+    if (arg == "on") {
+        tvOnOff(true);
+        reply = "TV turned ON";
+    } else if (arg == "off") {
+        tvOnOff(false);
+        reply = "TV turned OFF";
+    } else if (arg == "vol") {
+        string sub;
+        ss >> sub;
+        if (sub == "up") {
+            tvVol(tvVol() + 1);
+            reply = "TV volume UP to " + to_string(tvVol());
+        } else if (sub == "down") {
+            tvVol(tvVol() > 0 ? tvVol() - 1 : 0);
+            reply = "TV volume DOWN to " + to_string(tvVol());
+        } else if (!sub.empty()) {
+            tvVol((unsigned int)stoul(sub));
+            reply = "TV volume set to " + to_string(tvVol());
+        }
+    } else if (arg == "chan") {
+        string sub;
+        ss >> sub;
+        if (sub == "up") {
+            tvChan(tvChan() + 1);
+            reply = "TV channel UP to " + to_string(tvChan());
+        } else if (sub == "down") {
+            tvChan(tvChan() > 1 ? tvChan() - 1 : 1);
+            reply = "TV channel DOWN to " + to_string(tvChan());
+        } else if (!sub.empty()) {
+            tvChan((unsigned int)stoul(sub));
+            reply = "TV channel set to " + to_string(tvChan());
+        }
+    } else {
+        reply = string("TV: ") + (tvOnOff() ? "ON" : "OFF") +
+                ", Vol: " + to_string(tvVol()) +
+                ", Chan: " + to_string(tvChan());
+    }
 
     return reply;
 }
@@ -501,9 +600,53 @@ string MeshRoom::handleTv(uint32_t node_num, string &message)
 string MeshRoom::handleAc(uint32_t node_num, string &message)
 {
     string reply;
-
     (void)(node_num);
-    (void)(message);
+
+    stringstream ss(message);
+    string cmd, arg;
+    ss >> cmd >> arg;
+
+    if (arg == "on") {
+        acOnOff(true);
+        reply = "AC turned ON";
+    } else if (arg == "off") {
+        acOnOff(false);
+        reply = "AC turned OFF";
+    } else if (arg == "temp") {
+        string sub;
+        ss >> sub;
+        if (sub == "up") {
+            acTemp(acTemp() + 1);
+            reply = "AC temp UP to " + to_string(acTemp()) + "C";
+        } else if (sub == "down") {
+            acTemp(acTemp() - 1);
+            reply = "AC temp DOWN to " + to_string(acTemp()) + "C";
+        } else if (!sub.empty()) {
+            acTemp((unsigned int)stoul(sub));
+            reply = "AC temp set to " + to_string(acTemp()) + "C";
+        }
+    } else if (arg == "mode") {
+        string sub;
+        ss >> sub;
+        if (sub == "ac" || sub == "cool") {
+            acMode(AC_AC);
+            reply = "AC mode set to cool";
+        } else if (sub == "heat" || sub == "heater") {
+            acMode(AC_HEATER);
+            reply = "AC mode set to heat";
+        } else if (sub == "dry" || sub == "dehumidifier") {
+            acMode(AC_DEHUMIDIFIER);
+            reply = "AC mode set to dry";
+        } else if (sub == "auto") {
+            acMode(AC_AUTO);
+            reply = "AC mode set to auto";
+        }
+    } else {
+        reply = string("AC: ") + (acOnOff() ? "ON" : "OFF") +
+                ", Mode: " + acModeStr() +
+                ", Temp: " + to_string(acTemp()) + "C" +
+                ", Fan: " + to_string(acFanSpeed());
+    }
 
     return reply;
 }

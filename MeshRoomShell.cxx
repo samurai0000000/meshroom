@@ -207,7 +207,7 @@ int MeshRoomShell::ir(int argc, char **argv)
         this->printf("  Configure infrared remote control protocols.\n");
         this->printf("Commands:\n");
         this->printf("  ir                           Show enabled IR protocols\n");
-        this->printf("  ir add <protocol>            Enable an IR protocol (sony_bravia, samsung_tv, panasonic_ac)\n");
+        this->printf("  ir add <protocol>            Enable an IR protocol (sony_bravia, samsung_tv, panasonic_ac, panasonic_tv)\n");
         this->printf("  ir del <protocol>            Disable an IR protocol\n");
         return 0;
     }
@@ -223,12 +223,17 @@ int MeshRoomShell::ir(int argc, char **argv)
         if (ir_flags & MESHROOM_IR_PANASONIC_AC) {
             this->printf(" panasonic_ac ");
         }
+        if (ir_flags & MESHROOM_IR_PANASONIC_TV) {
+            this->printf(" panasonic_tv ");
+        }
         this->printf("\n");
     } else if ((argc == 3) && strcmp(argv[1], "add") == 0) {
-        if (strstr(argv[2], "bravia") != NULL) {
+        if (strstr(argv[2], "bravia") != NULL || strstr(argv[2], "sony") != NULL) {
             ir_flags |= MESHROOM_IR_SONY_BRAVIA;
         } else if (strstr(argv[2], "samsung") != NULL) {
             ir_flags |= MESHROOM_IR_SAMSUNG_TV;
+        } else if (strstr(argv[2], "panasonic_tv") != NULL || strstr(argv[2], "panasonic-tv") != NULL) {
+            ir_flags |= MESHROOM_IR_PANASONIC_TV;
         } else if (strstr(argv[2], "panasonic") != NULL) {
             ir_flags |= MESHROOM_IR_PANASONIC_AC;
         } else {
@@ -243,10 +248,12 @@ int MeshRoomShell::ir(int argc, char **argv)
             this->printf("failed!\n");
         }
     } else if ((argc == 3) && strcmp(argv[1], "del") == 0) {
-        if (strstr(argv[2], "bravia") != NULL) {
+        if (strstr(argv[2], "bravia") != NULL || strstr(argv[2], "sony") != NULL) {
             ir_flags &= ~MESHROOM_IR_SONY_BRAVIA;
         } else if (strstr(argv[2], "samsung") != NULL) {
             ir_flags &= ~MESHROOM_IR_SAMSUNG_TV;
+        } else if (strstr(argv[2], "panasonic_tv") != NULL || strstr(argv[2], "panasonic-tv") != NULL) {
+            ir_flags &= ~MESHROOM_IR_PANASONIC_TV;
         } else if (strstr(argv[2], "panasonic") != NULL) {
             ir_flags &= ~MESHROOM_IR_PANASONIC_AC;
         } else {

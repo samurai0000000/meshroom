@@ -13,6 +13,7 @@
 #include <HomeChat.hxx>
 #include <BaseNvm.hxx>
 #include <MorseBuzzer.hxx>
+#include <IrTransmitter.hxx>
 
 #define PUSHBUTTON_PIN   13
 #define OUTRESET_PIN     14
@@ -34,6 +35,7 @@ struct nvm_main_body {
 #define MESHROOM_IR_SONY_BRAVIA   0x1
 #define MESHROOM_IR_SAMSUNG_TV    0x2
 #define MESHROOM_IR_PANASONIC_AC  0x4
+#define MESHROOM_IR_PANASONIC_TV  0x8
 
     uint32_t n_authchans;
     uint32_t n_admins;
@@ -166,6 +168,11 @@ private:
     static void gpio_callback(uint gpio, uint32_t events);
 
     struct nvm_main_body _main_body;
+
+    void blastTvCommand(enum TvCommand cmd);
+    void blastAcState(void);
+
+    IrTransmitter _irTx;
 
     bool _tvOnOff;
     unsigned int _tvVol;
