@@ -117,6 +117,15 @@ int MeshRoomShell::system(int argc, char **argv)
 {
     int ret = 0;
     extern char __StackLimit, __bss_end__;
+
+    if ((argc >= 2) &&
+        ((strcmp(argv[1], "-h") == 0) || (strcmp(argv[1], "--help") == 0))) {
+        this->printf("Usage: %s [-h|--help] [-v]\n", argv[0]);
+        this->printf("  Display system uptime, heap, temperature, and FreeRTOS tasks.\n");
+        this->printf("Options:\n");
+        this->printf("  -v            Verbose output (show clock frequencies)\n");
+        return 0;
+    }
     struct mallinfo m = mallinfo();
     unsigned int total_heap = &__StackLimit  - &__bss_end__;
     unsigned int used_heap = m.uordblks;
@@ -148,6 +157,13 @@ int MeshRoomShell::system(int argc, char **argv)
 
 int MeshRoomShell::reboot(int argc, char **argv)
 {
+    if ((argc >= 2) &&
+        ((strcmp(argv[1], "-h") == 0) || (strcmp(argv[1], "--help") == 0))) {
+        this->printf("Usage: %s [-h|--help]\n", argv[0]);
+        this->printf("  Reboot the system.\n");
+        return 0;
+    }
+
     (void)(argc);
     (void)(argv);
 
@@ -162,6 +178,13 @@ int MeshRoomShell::reboot(int argc, char **argv)
 
 int MeshRoomShell::bootsel(int argc, char **argv)
 {
+    if ((argc >= 2) &&
+        ((strcmp(argv[1], "-h") == 0) || (strcmp(argv[1], "--help") == 0))) {
+        this->printf("Usage: %s [-h|--help]\n", argv[0]);
+        this->printf("  Reboot microcontroller into USB BOOTSEL mode for firmware flashing.\n");
+        return 0;
+    }
+
     (void)(argc);
     (void)(argv);
 
@@ -177,6 +200,17 @@ int MeshRoomShell::ir(int argc, char **argv)
 {
     int ret = 0;
     uint32_t ir_flags = meshroom->ir_flags();
+
+    if ((argc >= 2) &&
+        ((strcmp(argv[1], "-h") == 0) || (strcmp(argv[1], "--help") == 0))) {
+        this->printf("Usage: %s [-h|--help] [command] [args...]\n", argv[0]);
+        this->printf("  Configure infrared remote control protocols.\n");
+        this->printf("Commands:\n");
+        this->printf("  ir                           Show enabled IR protocols\n");
+        this->printf("  ir add <protocol>            Enable an IR protocol (sony_bravia, samsung_tv, panasonic_ac)\n");
+        this->printf("  ir del <protocol>            Disable an IR protocol\n");
+        return 0;
+    }
 
     if (argc == 1) {
         this->printf("infrared:");
@@ -239,6 +273,19 @@ done:
 int MeshRoomShell::tv(int argc, char **argv)
 {
     int ret = 0;
+
+    if ((argc >= 2) &&
+        ((strcmp(argv[1], "-h") == 0) || (strcmp(argv[1], "--help") == 0))) {
+        this->printf("Usage: %s [-h|--help] [command] [args...]\n", argv[0]);
+        this->printf("  Control TV power, volume, and channel via IR.\n");
+        this->printf("Commands:\n");
+        this->printf("  tv                           Display TV power, volume, and channel status\n");
+        this->printf("  tv on                        Turn TV power on\n");
+        this->printf("  tv off                       Turn TV power off\n");
+        this->printf("  tv vol up|down|<value>       Increase, decrease, or set volume level\n");
+        this->printf("  tv chan up|down|<value>      Increase, decrease, or set channel number\n");
+        return 0;
+    }
 
     if (argc == 1) {
         this->printf("tv: %s\n", meshroom->tvOnOff() ? "on" : "off");
@@ -307,6 +354,21 @@ done:
 int MeshRoomShell::ac(int argc, char **argv)
 {
     int ret = 0;
+
+    if ((argc >= 2) &&
+        ((strcmp(argv[1], "-h") == 0) || (strcmp(argv[1], "--help") == 0))) {
+        this->printf("Usage: %s [-h|--help] [command] [args...]\n", argv[0]);
+        this->printf("  Control Air Conditioner power, mode, temp, and fan via IR.\n");
+        this->printf("Commands:\n");
+        this->printf("  ac                           Display AC power, mode, temp, fanspeed, and fandir\n");
+        this->printf("  ac on                        Turn AC power on\n");
+        this->printf("  ac off                       Turn AC power off\n");
+        this->printf("  ac mode <ac|heater|dehumifier|auto>  Set operating mode\n");
+        this->printf("  ac temp up|down|<value>      Increase, decrease, or set target temperature (C)\n");
+        this->printf("  ac fanspeed up|down|<value>  Increase, decrease, or set fan speed\n");
+        this->printf("  ac fandir up|down|<value>    Increase, decrease, or set fan direction\n");
+        return 0;
+    }
 
     if (argc == 1) {
         this->printf("ac: %s\n", meshroom->acOnOff() ? "on" : "off");
@@ -409,6 +471,15 @@ done:
 
 int MeshRoomShell::buzz(int argc, char **argv)
 {
+    if ((argc >= 2) &&
+        ((strcmp(argv[1], "-h") == 0) || (strcmp(argv[1], "--help") == 0))) {
+        this->printf("Usage: %s [-h|--help] [duration_ms]\n", argv[0]);
+        this->printf("  Play buzzer tone.\n");
+        this->printf("Arguments:\n");
+        this->printf("  duration_ms   Buzzer tone duration in milliseconds (default: 100)\n");
+        return 0;
+    }
+
     if (argc == 1) {
         meshroom->buzz();
     } else if ((argc == 2)) {
@@ -429,6 +500,15 @@ int MeshRoomShell::buzz(int argc, char **argv)
 
 int MeshRoomShell::morse(int argc, char **argv)
 {
+    if ((argc >= 2) &&
+        ((strcmp(argv[1], "-h") == 0) || (strcmp(argv[1], "--help") == 0))) {
+        this->printf("Usage: %s [-h|--help] <text>\n", argv[0]);
+        this->printf("  Transmit text message as audible Morse code on the buzzer.\n");
+        this->printf("Arguments:\n");
+        this->printf("  text          Text string to play in Morse code\n");
+        return 0;
+    }
+
     string text;
 
     for (int i = 1; i < argc; i++) {
@@ -443,6 +523,16 @@ int MeshRoomShell::morse(int argc, char **argv)
 int MeshRoomShell::reset(int argc, char **argv)
 {
     int ret = 0;
+
+    if ((argc >= 2) &&
+        ((strcmp(argv[1], "-h") == 0) || (strcmp(argv[1], "--help") == 0))) {
+        this->printf("Usage: %s [-h|--help] [apply]\n", argv[0]);
+        this->printf("  Show reset statistics or trigger system reset.\n");
+        this->printf("Commands:\n");
+        this->printf("  reset         Display reset count and time since last reset\n");
+        this->printf("  reset apply   Trigger immediate system reset\n");
+        return 0;
+    }
 
     if (argc == 1) {
         time_t now, last;
@@ -469,6 +559,17 @@ int MeshRoomShell::reset(int argc, char **argv)
 int MeshRoomShell::watchdog(int argc, char **argv)
 {
     int ret = 0;
+
+    if ((argc >= 2) &&
+        ((strcmp(argv[1], "-h") == 0) || (strcmp(argv[1], "--help") == 0))) {
+        this->printf("Usage: %s [-h|--help] [enable|disable]\n", argv[0]);
+        this->printf("  Show or configure hardware watchdog timer.\n");
+        this->printf("Commands:\n");
+        this->printf("  watchdog            Display watchdog status and reboot cause\n");
+        this->printf("  watchdog enable     Enable hardware watchdog\n");
+        this->printf("  watchdog disable    Disable hardware watchdog\n");
+        return 0;
+    }
 
     if (argc == 1) {
         this->printf("watchdog: %s\n", meshroom->isWatchdogEnabled() ? "enabled" : "disabled");
