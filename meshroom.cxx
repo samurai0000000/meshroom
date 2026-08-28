@@ -118,7 +118,7 @@ static void meshtastic_task(__unused void *params)
 
         if (meshroom->isConnected() &&
             (meshroom->meshDeviceLastRecivedSecondsAgo() > 300) &&
-            (meshroom->getLastResetSecsAgo() > 300)) {
+            (meshroom->getLastResetSecsAgo() > 120)) {
             consoles_printf("detected meshtastic stuck!\n");
             meshroom->reset();
         }

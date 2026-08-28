@@ -462,6 +462,8 @@ void MeshRoom::reset(void)
 {
     _resetCount++;
 
+    sendDisconnect();
+
     gpio_put(OUTRESET_PIN, false);
     vTaskDelay(pdMS_TO_TICKS(500));
     gpio_put(OUTRESET_PIN, true);
