@@ -100,7 +100,6 @@ static void meshtastic_task(__unused void *params)
 {
     int ret = 0;
     time_t now, last_want_config, last_heartbeat;
-    bool announced_up = false;
 
     if (meshroom->loadNvm() == false) {
         meshroom->saveNvm();
@@ -155,33 +154,6 @@ static void meshtastic_task(__unused void *params)
                 }
             }
             taskYIELD();
-        }
-
-        if (meshroom->isConnected() && !announced_up) {
-            if (meshroom->nvmAuthchans().empty()) {
-                announced_up = true;
-            } else {
-                const struct nvm_authchan_entry &ac =
-                    meshroom->nvmAuthchans()[0];
-                string chanName(ac.name, strnlen(ac.name, sizeof(ac.name)));
-                uint8_t channel = meshroom->getChannel(chanName);
-                string announcement;
-
-                if (channel == 0xffU) {
-                    announced_up = true;
-                } else {
-                    announcement = meshroom->lookupLongName(meshroom->whoami(), true);
-                    if (announcement.empty()) {
-                        announcement = meshroom->whoamiString();
-                    }
-                    announcement += " is up";
-                    if (meshroom->textMessage(0xffffffffU, channel, announcement)) {
-                        announced_up = true;
-                    } else {
-                        consoles_printf("boot announce failed!\n");
-                    }
-                }
-            }
         }
 
         ret = serial1_check_markers();

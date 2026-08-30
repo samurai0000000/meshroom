@@ -170,6 +170,15 @@ public:
         _main_body.ir_flags = ir_flags;
     }
 
+    virtual void setNvm(shared_ptr<BaseNvm> nvm) {
+        SimpleClient::setNvm(nvm);
+        HomeChat::setNvm(nvm);
+    }
+
+    virtual void setClient(shared_ptr<SimpleClient> client) {
+        HomeChat::setClient(client);
+    }
+
     virtual bool loadNvm(void);
     virtual bool saveNvm(void);
     bool applyNvmToHomeChat(void);
