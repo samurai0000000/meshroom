@@ -63,3 +63,8 @@ openocd-reset:
 
 gdb: build/meshroom.elf
 	@gdb-multiarch $< -ex 'target remote localhost:3333'
+
+# Firmware flashing on Linux host
+.PHONY: flash
+flash:
+	@sync && cp build/meshroom.uf2 /mnt/pico && sync
