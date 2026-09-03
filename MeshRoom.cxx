@@ -682,30 +682,30 @@ string MeshRoom::handleTv(uint32_t node_num, string &message)
 
     if (cmd == "on") {
         tvOnOff(true);
-        reply = "TV turned ON";
+        reply = "tv: pwr=on";
     } else if (cmd == "off") {
         tvOnOff(false);
-        reply = "TV turned OFF";
+        reply = "tv: pwr=off";
     } else if (cmd == "toggle") {
         tvOnOff(!tvOnOff());
-        reply = string("TV toggled ") + (tvOnOff() ? "ON" : "OFF");
+        reply = string("tv: pwr=") + (tvOnOff() ? "on" : "off");
     } else if (cmd == "mute") {
         string sub;
         ss >> sub;
         toLowercase(sub);
         if (sub == "on") {
             tvMute(true);
-            reply = "TV muted";
+            reply = "tv: mute=on";
         } else if (sub == "off") {
             tvMute(false);
-            reply = "TV unmuted";
+            reply = "tv: mute=off";
         } else {
             toggleTvMute();
-            reply = string("TV mute ") + (tvMute() ? "ON" : "OFF");
+            reply = string("tv: mute=") + (tvMute() ? "on" : "off");
         }
     } else if (cmd == "input" || cmd == "source") {
         tvInput();
-        reply = "TV input switched";
+        reply = "tv: input=switched";
     } else if (cmd == "key" || (cmd.length() == 1 && isdigit((unsigned char)cmd[0]))) {
         unsigned int d = 0;
         if (cmd == "key") {
@@ -716,22 +716,22 @@ string MeshRoom::handleTv(uint32_t node_num, string &message)
             d = (unsigned int)(cmd[0] - '0');
         }
         tvDigit(d);
-        reply = "TV sent key " + to_string(d);
+        reply = "tv: key=" + to_string(d);
     } else if (cmd == "vol") {
         string sub;
         ss >> sub;
         toLowercase(sub);
         if (sub == "up") {
             tvVol(tvVol() + 1);
-            reply = "TV volume UP to " + to_string(tvVol());
+            reply = "tv: vol=" + to_string(tvVol());
         } else if (sub == "down") {
             tvVol(tvVol() > 0 ? tvVol() - 1 : 0);
-            reply = "TV volume DOWN to " + to_string(tvVol());
+            reply = "tv: vol=" + to_string(tvVol());
         } else if (!sub.empty()) {
             tvVol((unsigned int)strtoul(sub.c_str(), NULL, 10));
-            reply = "TV volume set to " + to_string(tvVol());
+            reply = "tv: vol=" + to_string(tvVol());
         } else {
-            reply = "TV volume: " + to_string(tvVol());
+            reply = "tv: vol=" + to_string(tvVol());
         }
     } else if (cmd == "chan") {
         string sub;
@@ -739,22 +739,22 @@ string MeshRoom::handleTv(uint32_t node_num, string &message)
         toLowercase(sub);
         if (sub == "up") {
             tvChan(tvChan() + 1);
-            reply = "TV channel UP to " + to_string(tvChan());
+            reply = "tv: chan=" + to_string(tvChan());
         } else if (sub == "down") {
             tvChan(tvChan() > 1 ? tvChan() - 1 : 1);
-            reply = "TV channel DOWN to " + to_string(tvChan());
+            reply = "tv: chan=" + to_string(tvChan());
         } else if (!sub.empty()) {
             tvChan((unsigned int)strtoul(sub.c_str(), NULL, 10));
-            reply = "TV channel set to " + to_string(tvChan());
+            reply = "tv: chan=" + to_string(tvChan());
         } else {
-            reply = "TV channel: " + to_string(tvChan());
+            reply = "tv: chan=" + to_string(tvChan());
         }
     } else {
-        reply = string("TV: ") + (tvOnOff() ? "ON" : "OFF") +
-                ", Vol: " + to_string(tvVol()) +
-                ", Chan: " + to_string(tvChan()) +
-                ", Mute: " + (tvMute() ? "ON" : "OFF") +
-                ", IR: " + tvIrProtocolStr();
+        reply = string("tv: pwr=") + (tvOnOff() ? "on" : "off") +
+                " vol=" + to_string(tvVol()) +
+                " chan=" + to_string(tvChan()) +
+                " mute=" + (tvMute() ? "on" : "off") +
+                " ir=" + tvIrProtocolStr();
     }
 
     return reply;
@@ -772,28 +772,28 @@ string MeshRoom::handleAc(uint32_t node_num, string &message)
 
     if (cmd == "on") {
         acOnOff(true);
-        reply = "AC turned ON";
+        reply = "ac: pwr=on";
     } else if (cmd == "off") {
         acOnOff(false);
-        reply = "AC turned OFF";
+        reply = "ac: pwr=off";
     } else if (cmd == "tx" || cmd == "blast") {
         blastAcState();
-        reply = "AC state re-transmitted";
+        reply = "ac: ir=tx";
     } else if (cmd == "temp") {
         string sub;
         ss >> sub;
         toLowercase(sub);
         if (sub == "up") {
             acTemp(acTemp() + 1);
-            reply = "AC temp UP to " + to_string(acTemp()) + "C";
+            reply = "ac: temp=" + to_string(acTemp());
         } else if (sub == "down") {
             acTemp(acTemp() - 1);
-            reply = "AC temp DOWN to " + to_string(acTemp()) + "C";
+            reply = "ac: temp=" + to_string(acTemp());
         } else if (!sub.empty()) {
             acTemp((unsigned int)strtoul(sub.c_str(), NULL, 10));
-            reply = "AC temp set to " + to_string(acTemp()) + "C";
+            reply = "ac: temp=" + to_string(acTemp());
         } else {
-            reply = "AC temp: " + to_string(acTemp()) + "C";
+            reply = "ac: temp=" + to_string(acTemp());
         }
     } else if (cmd == "mode") {
         string sub;
@@ -801,21 +801,21 @@ string MeshRoom::handleAc(uint32_t node_num, string &message)
         toLowercase(sub);
         if (sub == "ac" || sub == "cool") {
             acMode(AC_AC);
-            reply = "AC mode set to cool";
+            reply = "ac: mode=cool";
         } else if (sub == "heat" || sub == "heater") {
             acMode(AC_HEATER);
-            reply = "AC mode set to heat";
+            reply = "ac: mode=heat";
         } else if (sub == "dry" || sub == "dehumidifier" || sub == "dehumifier") {
             acMode(AC_DEHUMIDIFIER);
-            reply = "AC mode set to dry";
+            reply = "ac: mode=dry";
         } else if (sub == "fan") {
             acMode(AC_FAN);
-            reply = "AC mode set to fan";
+            reply = "ac: mode=fan";
         } else if (sub == "auto") {
             acMode(AC_AUTO);
-            reply = "AC mode set to auto";
+            reply = "ac: mode=auto";
         } else {
-            reply = "AC mode: " + acModeStr();
+            reply = "ac: mode=" + acModeStr();
         }
     } else if (cmd == "fanspeed" || cmd == "fan") {
         string sub;
@@ -823,33 +823,33 @@ string MeshRoom::handleAc(uint32_t node_num, string &message)
         toLowercase(sub);
         if (sub == "up") {
             acFanSpeed(acFanSpeed() + 1);
-            reply = "AC fanspeed UP to " + acFanSpeedStr();
+            reply = "ac: fan=" + (acFanSpeed() == 0 ? string("auto") : to_string(acFanSpeed()));
         } else if (sub == "down") {
             acFanSpeed(acFanSpeed() > 0 ? acFanSpeed() - 1 : 0);
-            reply = "AC fanspeed DOWN to " + acFanSpeedStr();
+            reply = "ac: fan=" + (acFanSpeed() == 0 ? string("auto") : to_string(acFanSpeed()));
         } else if (sub == "auto") {
             acFanSpeed(0);
-            reply = "AC fanspeed set to auto";
+            reply = "ac: fan=auto";
         } else if (sub == "quiet" || sub == "min") {
             acFanSpeed(1);
-            reply = "AC fanspeed set to 1 (quiet)";
+            reply = "ac: fan=1";
         } else if (sub == "low") {
             acFanSpeed(2);
-            reply = "AC fanspeed set to 2 (low)";
+            reply = "ac: fan=2";
         } else if (sub == "med" || sub == "medium") {
             acFanSpeed(3);
-            reply = "AC fanspeed set to 3 (med)";
+            reply = "ac: fan=3";
         } else if (sub == "high") {
             acFanSpeed(4);
-            reply = "AC fanspeed set to 4 (high)";
+            reply = "ac: fan=4";
         } else if (sub == "max") {
             acFanSpeed(5);
-            reply = "AC fanspeed set to 5 (max)";
+            reply = "ac: fan=5";
         } else if (!sub.empty()) {
             acFanSpeed((unsigned int)strtoul(sub.c_str(), NULL, 10));
-            reply = "AC fanspeed set to " + acFanSpeedStr();
+            reply = "ac: fan=" + (acFanSpeed() == 0 ? string("auto") : to_string(acFanSpeed()));
         } else {
-            reply = "AC fanspeed: " + acFanSpeedStr();
+            reply = "ac: fan=" + (acFanSpeed() == 0 ? string("auto") : to_string(acFanSpeed()));
         }
     } else if (cmd == "fandir" || cmd == "vane" || cmd == "swing") {
         string sub;
@@ -857,27 +857,27 @@ string MeshRoom::handleAc(uint32_t node_num, string &message)
         toLowercase(sub);
         if (sub == "up") {
             acFanDir(1);
-            reply = "AC vane set to 1 (up)";
+            reply = "ac: vane=1";
         } else if (sub == "up-mid" || sub == "upmid") {
             acFanDir(2);
-            reply = "AC vane set to 2 (up-mid)";
+            reply = "ac: vane=2";
         } else if (sub == "mid" || sub == "middle") {
             acFanDir(3);
-            reply = "AC vane set to 3 (mid)";
+            reply = "ac: vane=3";
         } else if (sub == "down-mid" || sub == "downmid") {
             acFanDir(4);
-            reply = "AC vane set to 4 (down-mid)";
+            reply = "ac: vane=4";
         } else if (sub == "down") {
             acFanDir(5);
-            reply = "AC vane set to 5 (down)";
+            reply = "ac: vane=5";
         } else if (sub == "auto") {
             acFanDir(0);
-            reply = "AC vane set to auto";
+            reply = "ac: vane=auto";
         } else if (!sub.empty()) {
             acFanDir((unsigned int)strtoul(sub.c_str(), NULL, 10));
-            reply = "AC vane set to " + acFanDirStr();
+            reply = "ac: vane=" + (acFanDir() == 0 ? string("auto") : to_string(acFanDir()));
         } else {
-            reply = "AC vane: " + acFanDirStr();
+            reply = "ac: vane=" + (acFanDir() == 0 ? string("auto") : to_string(acFanDir()));
         }
     } else if (cmd == "powerful" || cmd == "turbo" || cmd == "boost") {
         string sub;
@@ -890,7 +890,7 @@ string MeshRoom::handleAc(uint32_t node_num, string &message)
         } else {
             acPowerful(!acPowerful());
         }
-        reply = string("AC turbo ") + (acPowerful() ? "ON" : "OFF");
+        reply = string("ac: turbo=") + (acPowerful() ? "on" : "off");
     } else if (cmd == "quiet" || cmd == "silent") {
         string sub;
         ss >> sub;
@@ -902,7 +902,7 @@ string MeshRoom::handleAc(uint32_t node_num, string &message)
         } else {
             acQuiet(!acQuiet());
         }
-        reply = string("AC quiet ") + (acQuiet() ? "ON" : "OFF");
+        reply = string("ac: quiet=") + (acQuiet() ? "on" : "off");
     } else if (cmd == "set") {
         string token;
         while (ss >> token) {
@@ -933,19 +933,19 @@ string MeshRoom::handleAc(uint32_t node_num, string &message)
                 }
             }
         }
-        reply = string("AC: ") + (acOnOff() ? "ON" : "OFF") +
-                ", Mode: " + acModeStr() +
-                ", Temp: " + to_string(acTemp()) + "C" +
-                ", Fan: " + acFanSpeedStr();
+        reply = string("ac: pwr=") + (acOnOff() ? "on" : "off") +
+                " mode=" + acModeStr() +
+                " temp=" + to_string(acTemp()) +
+                " fan=" + (acFanSpeed() == 0 ? string("auto") : to_string(acFanSpeed()));
     } else {
-        reply = string("AC: ") + (acOnOff() ? "ON" : "OFF") +
-                ", Mode: " + acModeStr() +
-                ", Temp: " + to_string(acTemp()) + "C" +
-                ", Fan: " + acFanSpeedStr() +
-                ", Vane: " + acFanDirStr() +
-                ", Powerful: " + (acPowerful() ? "ON" : "OFF") +
-                ", Quiet: " + (acQuiet() ? "ON" : "OFF") +
-                ", IR: " + acIrProtocolStr();
+        reply = string("ac: pwr=") + (acOnOff() ? "on" : "off") +
+                " mode=" + acModeStr() +
+                " temp=" + to_string(acTemp()) +
+                " fan=" + (acFanSpeed() == 0 ? string("auto") : to_string(acFanSpeed())) +
+                " vane=" + (acFanDir() == 0 ? string("auto") : to_string(acFanDir())) +
+                " turbo=" + (acPowerful() ? "on" : "off") +
+                " quiet=" + (acQuiet() ? "on" : "off") +
+                " ir=" + acIrProtocolStr();
     }
 
     return reply;
@@ -981,7 +981,7 @@ string MeshRoom::handleMorse(uint32_t node_num, string &message)
     (void)(message);
 
     addMorseText(message);
-    reply = "buzzing morse code: '" + message + "'";
+    reply = "morse: msg=" + message;
 
     return reply;
 }

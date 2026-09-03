@@ -66,5 +66,5 @@ gdb: build/meshroom.elf
 
 # Firmware flashing on Linux host
 .PHONY: flash
-flash:
+flash: build/meshroom.uf2
 	@sync && cp build/meshroom.uf2 /mnt/pico && sync
