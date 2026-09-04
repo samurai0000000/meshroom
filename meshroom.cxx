@@ -222,8 +222,9 @@ void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
 {
     (void)(xTask);
 
-    usbcdc_printf("stack over-flow: %s!\n", pcTaskName);
     serial0_printf("stack over-flow: %s!\n", pcTaskName);
+    uart_tx_wait_blocking(uart0);
+    usbcdc_printf("stack over-flow: %s!\n", pcTaskName);
     for (;;);
 }
 
@@ -321,14 +322,15 @@ int main(void)
                 &shell1Task);
 
 #if defined(configUSE_CORE_AFFINITY) && (configNUMBER_OF_CORES > 1)
-    /* picows: USB/watchdog/LED on core 0, shells on core 1. Meshtastic stays
-     * on the shell core but below them so it cannot starve CDC or UART. */
+    /* Pin all USB-touching tasks (usbTask and shell0Task), watchdog, and LED
+     * strictly to Core 0 to avoid RP2040 USB controller dual-core errata.
+     * Meshtastic and UART0 shell (shell1Task) run on Core 1. */
     vTaskCoreAffinitySet(watchdogTask, 0x1);
     vTaskCoreAffinitySet(ledTask, 0x1);
     vTaskCoreAffinitySet(usbTask, 0x1);
     vTaskCoreAffinitySet(morsebuzzerTask, 0x1);
+    vTaskCoreAffinitySet(shell0Task, 0x1);
     vTaskCoreAffinitySet(meshtasticTask, 0x2);
-    vTaskCoreAffinitySet(shell0Task, 0x2);
     vTaskCoreAffinitySet(shell1Task, 0x2);
 #endif
 
