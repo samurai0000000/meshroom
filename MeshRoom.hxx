@@ -147,6 +147,7 @@ protected:
 
     // Extend HomeChat
 
+    virtual string handleRollcall(uint32_t node_num, string &message);
     virtual string handleUnknown(uint32_t node_num, uint32_t dest,
                                  uint8_t channel, string &message);
     virtual string handleEnv(uint32_t node_num, string &message);

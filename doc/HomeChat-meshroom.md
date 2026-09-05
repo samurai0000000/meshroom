@@ -62,3 +62,23 @@ Controls AC settings and transmits state via IR blast:
     ```
 - **`status`**:
   - Returns `operational`.
+
+---
+
+## 5. HomeMesh Auto-Discovery & Rollcall
+
+`meshroom` supports machine-readable capability reporting for automatic registration with `meshmon` and Home Assistant:
+
+* **Command**: `rollcall [target]`
+  * If `target` is specified (by hex node ID, decimal ID, short name, or long name), `meshroom` only responds if targeted to itself or `"all"`.
+* **Structured Response**:
+  ```text
+  rollcall: app=meshroom ver=2.1.4 hw=rp2040 caps=ac_ir,tv_ir,board_temp,buzzer
+  ```
+
+### Exported Subsystem Capabilities:
+- `ac_ir`: Panasonic / generic AC infrared climate control (`climate.meshmon_<node>_ac`, `switch.meshmon_<node>_ac_power`, `button.meshmon_<node>_ac_blast`).
+- `tv_ir`: Sony Bravia / generic TV infrared control (`switch.meshmon_<node>_tv_power`, `switch.meshmon_<node>_tv_mute`, `number.meshmon_<node>_tv_volume`, `number.meshmon_<node>_tv_channel`, `button.meshmon_<node>_tv_input`).
+- `board_temp`: RP2040 internal temperature sensor (`sensor.meshmon_<node>_board_temp`).
+- `buzzer`: Piezo buzzer tone and Morse code signaling.
+

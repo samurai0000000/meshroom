@@ -19,6 +19,7 @@
 #include <PicoPlatform.hxx>
 #include <meshroom.h>
 #include <MeshRoom.hxx>
+#include "version.h"
 
 #define BUTTON_EVENT_QUEUE_LEN  5
 
@@ -638,7 +639,77 @@ string MeshRoom::handleUnknown(uint32_t node_num, uint32_t dest,
         reply = handleBuzz(node_num, message);
     } else if (first_word == "morse") {
         reply = handleMorse(node_num, message);
+    } else if (first_word == "rollcall") {
+        reply = handleRollcall(node_num, message);
     }
+
+    return reply;
+}
+
+string MeshRoom::handleRollcall(uint32_t node_num, string &message)
+{
+    string reply;
+
+    (void)(node_num);
+
+    trimWhitespace(message);
+
+    if (!message.empty()) {
+        string target = message;
+        string first_word = target.substr(0, target.find(' '));
+        toLowercase(first_word);
+
+        if (first_word != "all") {
+            bool matches = false;
+
+            if (_client != NULL) {
+                uint32_t whoami = _client->whoami();
+                char hexBuf1[16], hexBuf2[16], hexBuf3[16];
+                snprintf(hexBuf1, sizeof(hexBuf1), "!%08x", (unsigned int)whoami);
+                snprintf(hexBuf2, sizeof(hexBuf2), "0x%08x", (unsigned int)whoami);
+                snprintf(hexBuf3, sizeof(hexBuf3), "%08x", (unsigned int)whoami);
+
+                string myShortName = _client->lookupShortName(whoami);
+                toLowercase(myShortName);
+                string myLongName = _client->lookupLongName(whoami);
+                toLowercase(myLongName);
+
+                if (first_word == hexBuf1 ||
+                    first_word == hexBuf2 ||
+                    first_word == hexBuf3 ||
+                    first_word == myShortName ||
+                    first_word == myLongName ||
+                    first_word == _client->whoamiString()) {
+                    matches = true;
+                } else {
+                    uint32_t targetId = 0;
+                    if (first_word.size() > 1 && first_word[0] == '!') {
+                        targetId = (uint32_t)strtoul(first_word.c_str() + 1, NULL, 16);
+                    } else if (first_word.rfind("0x", 0) == 0) {
+                        targetId = (uint32_t)strtoul(first_word.c_str(), NULL, 16);
+                    } else {
+                        targetId = (uint32_t)strtoul(first_word.c_str(), NULL, 10);
+                    }
+                    if (targetId != 0 && targetId == whoami) {
+                        matches = true;
+                    }
+                }
+            }
+
+            if (!matches) {
+                return "";
+            }
+        }
+    }
+
+    reply = "rollcall: app=meshroom ver=";
+    reply += MYPROJECT_VERSION_STRING;
+#if defined(PICO_RP2350)
+    reply += " hw=rp2350";
+#else
+    reply += " hw=rp2040";
+#endif
+    reply += " caps=ac_ir,tv_ir,board_temp,buzzer";
 
     return reply;
 }
